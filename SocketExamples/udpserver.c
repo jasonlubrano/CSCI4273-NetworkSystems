@@ -62,7 +62,7 @@ int main() {
 
 	printf("%s\n",sndbuf);
 
-	pclose(sockfd);
+	close(sockfd);
 	
 	return 0; 
 } 
