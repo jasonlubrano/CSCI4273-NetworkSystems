@@ -41,11 +41,14 @@ int main() {
 	
 	sendto(sockfd, (const char *)sndbuf, strlen(sndbuf), 
 		0, (const struct sockaddr *) &servaddr, 
-			sizeof(servaddr)); 
-		
-	n = recvfrom(sockfd, (char *)rcvbuf, MAXLINE, 
-				MSG_WAITALL, (struct sockaddr *) &servaddr, 
-				&len); 
+		sizeof(servaddr)); 
+	printf("message sent to server\n");
+
+	n = recvfrom(sockfd, (char *)rcvbuf, strlen(rcvbuf), 
+		0, (struct sockaddr *) &servaddr, 
+		&len);
+	printf("message recv from server\n");
+
 	rcvbuf[n] = '\0'; 
 	printf("%s\n", rcvbuf); 
 

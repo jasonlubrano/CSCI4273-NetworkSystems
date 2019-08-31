@@ -46,8 +46,8 @@ int main() {
 	printf("The server is ready to receive\n"); 
 	
 	n = recvfrom(sockfd, (char *)rcvbuf, MAXLINE, 
-				0, ( struct sockaddr *) &cliaddr, 
-				&len); 
+		0, ( struct sockaddr *) &cliaddr, 
+		&len); 
 
 	/* captalize the received string */
 	while (rcvbuf[i]) {
@@ -58,7 +58,7 @@ int main() {
 
 	sendto(sockfd, (const char *)sndbuf, strlen(sndbuf), 
 		0, (const struct sockaddr *) &cliaddr, 
-			len); 
+		sizeof(cliaddr)); 
 
 	printf("%s\n",sndbuf);
 
