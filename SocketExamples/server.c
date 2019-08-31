@@ -6,8 +6,7 @@
 #include <sys/types.h> 
 #include <sys/socket.h> 
 #include <arpa/inet.h> 
-#include <netinet/in.h> 
-#include <ctype.h>
+#include <netinet/in.h>
 
 #define PORT	 8080 
 #define MAXLINE 1024 
@@ -15,15 +14,11 @@
 // Driver code 
 int main() { 
 	int sockfd; 
-	char rcvbuf[MAXLINE]; 
-	char sndbuf[MAXLINE]; 
-	struct sockaddr_in servaddr, cliaddr;
-	int i = 0;
+	char buffer[MAXLINE]; 
+	char *hello = "Hello from server"; 
+	struct sockaddr_in servaddr, cliaddr; 
 	
-	// Creating sowhile (rcvbuf[i]) {
-	// 	sndbuf[i] = toupper(rcvbuf[i]);
-	// 	i++;
-	// }cket file descriptor 
+	// Creating socket file descriptor 
 	if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
 		perror("socket creation failed"); 
 		exit(EXIT_FAILURE); 
@@ -43,32 +38,19 @@ int main() {
 	{ 
 		perror("bind failed"); 
 		exit(EXIT_FAILURE); 
-	}
-
-	printf("The server is ready to receive\n"); 
+	} 
 	
-	int len, n;
-	n = recvfrom(sockfd, (char *)rcvbuf, MAXLINE, 
+	int len, n; 
+	n = recvfrom(sockfd, (char *)buffer, MAXLINE, 
 				MSG_WAITALL, ( struct sockaddr *) &cliaddr, 
-				&len);
+				&len); 
+	buffer[n] = '\0'; 
 
-	rcvbuf[n] = '\0';
-	
-	printf("Client: %s\n", rcvbuf);
-
-	/* captalize the received string */
-	while (rcvbuf[i]) {
-		sndbuf[i] = toupper(rcvbuf[i]);
-		i++;
-	}
-
-	printf("MSG to Client: %s\n", sndbuf);
-
-	sendto(sockfd, (const char *)sndbuf, strlen(sndbuf), 
+	printf("Client : %s\n", buffer); 
+	sendto(sockfd, (const char *)hello, strlen(hello), 
 		MSG_CONFIRM, (const struct sockaddr *) &cliaddr, 
-			len);
-
-	printf("message sent to client\n");
-
+			len); 
+	printf("Hello message sent.\n"); 
+	
 	return 0; 
-}
+} 

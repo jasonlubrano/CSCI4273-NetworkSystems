@@ -14,22 +14,15 @@
 // Driver code 
 int main() { 
 	int sockfd; 
-	char rcvbuf[MAXLINE]; 
-	char sndbuf[MAXLINE]; 
+	char buffer[MAXLINE]; 
+	char *hello = "Hello from client"; 
 	struct sockaddr_in	 servaddr; 
-	//socklen_t n, len; 
 
 	// Creating socket file descriptor 
 	if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
 		perror("socket creation failed"); 
 		exit(EXIT_FAILURE); 
 	} 
-
-	printf("Input lowercase sentence:");
-
-	if (fgets(sndbuf, sizeof sndbuf, stdin)) {
-		sndbuf[strcspn(sndbuf, "\n")] = '\0';
-	}
 
 	memset(&servaddr, 0, sizeof(servaddr)); 
 	
@@ -38,22 +31,20 @@ int main() {
 	servaddr.sin_port = htons(PORT); 
 	servaddr.sin_addr.s_addr = INADDR_ANY; 
 	
-	int n, len;
-
-	sendto(sockfd, (const char *)sndbuf, strlen(sndbuf), 
-			MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
+	int n, len; 
+	
+	sendto(sockfd, (const char *)hello, strlen(hello), 
+		MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
 			sizeof(servaddr)); 
+	printf("Hello message sent.\n"); 
+		
+	n = recvfrom(sockfd, (char *)buffer, MAXLINE, 
+				MSG_WAITALL, (struct sockaddr *) &servaddr, 
+				&len);
 	
-	printf("message sent to server\n");
-
-	n = recvfrom(sockfd, (char *)rcvbuf, MAXLINE, 
-			MSG_WAITALL, (struct sockaddr *) &servaddr, 
-			&len);
-	
-	rcvbuf[n] = '\0';
-	printf("Server: %s\n", rcvbuf); 
+	buffer[n] = '\0'; 
+	printf("Server : %s\n", buffer); 
 
 	close(sockfd); 
 	return 0; 
 } 
-
