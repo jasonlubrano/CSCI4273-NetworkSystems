@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
        exit(0);
     }
     hostname = argv[1];
-    portno = atoi(argv[2]);
+    portno = atoi(argv[ 2]);
 
     /* socket: create the socket */
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);

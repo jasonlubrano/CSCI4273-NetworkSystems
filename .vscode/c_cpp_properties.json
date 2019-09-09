@@ -1,27 +1,17 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
-            "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE"
-            ],
-            "windowsSdkVersion": "10.0.17134.0",
-            "compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Tools/MSVC/14.15.26726/bin/Hostx64/x64/cl.exe",
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "msvc-x64",
-            "browse": {
-                "path": [
-                    "C:\\MinGW\\lib\\gcc\\mingw32\\8.2.0\\include\\c++"
-
-                ]
-            }
+            "intelliSenseMode": "gcc-x64"
         }
     ],
+    "editor.fontFamily": "'Ubuntu Mono', monospace",
     "version": 4
 }
