@@ -27,6 +27,18 @@ void error(char *msg){
     exit(0);
 }
 
+void errorcheckrecv(int nn){
+    if(nn < 0){
+        error("ERROR in recvfrom");
+    }
+}
+
+void errorchecksend(int nn){
+    if(nn < 0){
+        error("ERROR in sendto");
+    }
+}
+
 // handles geting input
 void buffinput(char* buffcmd){
     // get input from user
@@ -48,7 +60,7 @@ void buffparse(char *buf, char *argcmd, char *argfile){
     // TODO: make into function
     memset(argcmd, 0, BUFFSIZE * (sizeof(char)));
     memset(argfile, 0, BUFFSIZE * (sizeof(char)));
-    char delim[] = " ,.-";
+    char delim[] = " ";
     char argt[BUFFSIZE];
     char *clientcmd;
     char *filename;
@@ -125,55 +137,77 @@ int main(int argc, char **argv){
     bcopy((char*)server->h_addr, (char*)&serveraddr.sin_addr.s_addr, server->h_length);
     serveraddr.sin_port = htons(portno);
 
-    // get input from user
-    char buff[BUFFSIZE];
-    buffinput(buff);
-    printf(MSGSUCC "input: %s, len: %ld" MSGNORM "\n", buff, strlen(buff));
+    // basic messages for debugging packets
+    char ready[BUFFSIZE] = "Ready to connect";
+    char acknoledge[BUFFSIZE] = "Message received";
 
+    // server setup
+    int serverlen = sizeof(serveraddr);
+    int n = sendto(sockfd, ready, sizeof(ready), 0,
+                (const struct sockaddr *) &serveraddr, serverlen);
+    if(n < 0){
+        error(MSGERRR "ERROR in connect\n" MSGNORM);
+    }
+
+    char buff[BUFFSIZE];
+    n = recvfrom(sockfd, buff, BUFFSIZE, 0,
+                (struct sockaddr *) &serveraddr, &serverlen);
+    if (n < 0){
+      error("ERROR in recvfrom");
+    }
+    printf("Echo from server: %s, n = %d \n", buff, n);
+
+    // get input from user
+    // char buff[BUFFSIZE];
     // get cmd and filename
     char argb[BUFFSIZE]; //command
     char argf[BUFFSIZE]; //filename
-    buffparse(buff, argb, argf);
-    printf(MSGSUCC "argb: %s, len: %ld" MSGNORM "\n", argb, strlen(argb));
-    printf(MSGSUCC "argf: %s, len: %ld" MSGNORM "\n", argf, strlen(argf));
 
     // handle input from user
-    while(strcmp(argb, "exit") != 0){
+    do{
+        buffinput(buff);
+        printf(MSGSUCC "input: %s, len: %ld" MSGNORM "\n", buff, strlen(buff));
+        buffparse(buff, argb, argf);
+        printf(MSGSUCC "argb: %s, len: %ld" MSGNORM "\n", argb, strlen(argb));
+        printf(MSGSUCC "argf: %s, len: %ld" MSGNORM "\n", argf, strlen(argf));
+        printf(MSGSUCC "input: %s, len: %ld" MSGNORM "\n", buff, strlen(buff));
+        
+        n = sendto(sockfd, argb, sizeof(argb), 0,
+                    (const struct sockaddr *) &serveraddr, serverlen);
+        errorchecksend(n);
+        
+        n = recvfrom(sockfd, buff, BUFFSIZE, 0,
+                    (struct sockaddr *) &serveraddr, &serverlen);
+        errorcheckrecv(n);
+        printf("Echo from server: %s, n = %d \n", buff, n);
+        
+        n = sendto(sockfd, argf, sizeof(argf), 0,
+                    (const struct sockaddr *) &serveraddr, serverlen);
+        errorchecksend(n);
+        
+        n = recvfrom(sockfd, buff, BUFFSIZE, 0,
+                    (struct sockaddr *) &serveraddr, &serverlen);
+        errorcheckrecv(n);
+        printf("Echo from server: %s, n = %d \n", buff, n);
+
         // client handle cmds
         if(strcmp(argb, "puts") == 0){
             printf(MSGTERM "Putting file to server" MSGNORM "\n");
-            // handle putting files to server
-            // handle getting input again
-            buffinput(buff);
-            buffparse(buff, argb, argf);
-            printf(MSGSUCC "argb: %s, len: %ld" MSGNORM "\n", argb, strlen(argb));
-            printf(MSGSUCC "argf: %s, len: %ld" MSGNORM "\n", argf, strlen(argf));
+            /* message handling */
         } else if (strcmp(argb, "gets") == 0){
             printf(MSGTERM "Getting file from server" MSGNORM "\n");
             // handle getting file from server
             // handle getting input again
-            buffinput(buff);
-            buffparse(buff, argb, argf);
-            printf(MSGSUCC "argb: %s, len: %ld" MSGNORM "\n", argb, strlen(argb));
-            printf(MSGSUCC "argf: %s, len: %ld" MSGNORM "\n", argf, strlen(argf));
         } else if (strcmp(argb, "ls") == 0){
             printf(MSGTERM "Listing files on server" MSGNORM "\n");
             // handle listing files from server
             // h  andle getting input again
-            buffinput(buff);
-            buffparse(buff, argb, argf);
-            printf(MSGSUCC "argb: %s, len: %ld" MSGNORM "\n", argb, strlen(argb));
-            printf(MSGSUCC "argf: %s, len: %ld" MSGNORM "\n", argf, strlen(argf));
         } else {
             // handle getting input again
             printf(MSGERRR "NOT VALID INPUT" MSGNORM "\n");
             printf(MSGWARN "Commands: puts <filename>, gets <filename>, ls, exit" MSGNORM "\n");
-            buffinput(buff);
-            buffparse(buff, argb, argf);
-            printf(MSGSUCC "argb: %s, len: %ld" MSGNORM "\n", argb, strlen(argb));
-            printf(MSGSUCC "argf: %s, len: %ld" MSGNORM "\n", argf, strlen(argf));
         }
-    }
+    }while(strcmp(argb, "exit") != 0);
 
     printf(MSGTERM "PROGRAM EXITING\n" MSGNORM);
     return 0;
