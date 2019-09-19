@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <ctype.h>
 
 #define BUFFSIZE 1024
 #define MSGERRR "\x1b[31m"
@@ -36,6 +37,13 @@ void errorcheckrecv(int nn){
 void errorchecksend(int nn){
     if(nn < 0){
         error("ERROR in sendto");
+    }
+}
+
+void clearBuff(char* b){
+    int i;
+    for(i=0; i < BUFFSIZE; i++){
+        b[i] = '\0';
     }
 }
 
@@ -162,6 +170,11 @@ int main(int argc, char **argv){
     // get cmd and filename
     char argb[BUFFSIZE]; //command
     char argf[BUFFSIZE]; //filename
+    int nbytes;
+
+    FILE *fp;
+    int wds = 0;
+    char c;
 
     // handle input from user
     do{
@@ -194,6 +207,12 @@ int main(int argc, char **argv){
         if(strcmp(argb, "puts") == 0){
             printf(MSGTERM "Putting file to server" MSGNORM "\n");
             /* message handling */
+            clearBuff(buff);
+            fp = fopen(argf, "r");
+            scanf("%s", fp);
+            sendto(sockfd, buff, sizeof(buff), 0,
+                    (struct sockaddr *) &serveraddr, serverlen);
+            printf("packet sent\n");           
         } else if (strcmp(argb, "gets") == 0){
             printf(MSGTERM "Getting file from server" MSGNORM "\n");
             // handle getting file from server

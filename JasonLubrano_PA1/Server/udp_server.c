@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <ctype.h>
 
 #define BUFFSIZE 1024
 #define MSGERRR "\x1b[31m"
@@ -100,6 +101,13 @@ void buffparse(char *buf, char *argcmd, char *argfile){
     }
 }
 
+void clearBuff(char* b){
+    int i;
+    for(i=0; i < BUFFSIZE; i++){
+        b[i] = '\0';
+    }
+}
+
 int main(int argc, char **argv){
     // get right number of arguemnts
     if(argc != 2){
@@ -174,6 +182,16 @@ int main(int argc, char **argv){
 
     printf(MSGSUCC "Sent to client: %s, n= %d\n" MSGNORM, buff, n);
 
+    FILE *fp;
+    int ch = 0;
+    int wds;
+    int sockfd2;
+
+    sockfd2 = accept(sockfd, (struct sockaddr *) &clientaddr, &clientlen);
+    if(sockfd2 < 0){
+        printf(MSGERRR "Socket 2 Error\n" MSGNORM);
+    }
+    
     // state machine
     do{
         n = recvfrom(sockfd, argb, BUFFSIZE, 0,
@@ -193,8 +211,11 @@ int main(int argc, char **argv){
         
         // server handle cmds
         if(strcmp(argb, "puts") == 0){
-            printf(MSGTERM "erver saving file" MSGNORM "\n");
+            printf(MSGTERM "Server saving file" MSGNORM "\n");
             /* message handling */
+            clearBuff(buff);
+
+            printf(MSGTERM "file saved\n" MSGNORM);
         } else if (strcmp(argb, "gets") == 0){
             printf(MSGTERM "Server retrieving file" MSGNORM "\n");
             // handle getting file from server
