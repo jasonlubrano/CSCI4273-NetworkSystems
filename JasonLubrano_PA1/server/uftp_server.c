@@ -10,13 +10,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <arpa/inet.h>
-#include <ctype.h>
 
 
 #define BUFFSIZE 1024
@@ -25,6 +25,8 @@
 #define MSGNORM "\x1b[0m"
 #define MSGTERM "\x1b[35m"
 #define MSGWARN "\x1b[33m"
+
+#define TRUE 1
 
 // error message
 void error(char *msg){
@@ -44,6 +46,10 @@ void errorchecksend(int nn){
     }
 }
 
+void clientecho(char *buff){
+    printf( MSGTERM "%s" MSGNORM "\n", buff);
+}
+
 // handles geting input
 void buffinput(char* buffcmd){
     // get input from user
@@ -59,90 +65,26 @@ void buffinput(char* buffcmd){
     buffcmd[strlen(buffcmd)-1] = '\0';
 }
 
-// handles parsing the commands
 void buffparse(char *buf, char *argcmd, char *argfile){
-    // parse input from user
-    // TODO: make into function
+    int i=0;
+    char delim[] = " ";
+    
     memset(argcmd, 0, BUFFSIZE * (sizeof(char)));
     memset(argfile, 0, BUFFSIZE * (sizeof(char)));
-    char delim[] = " ,.-";
-    char argt[BUFFSIZE];
-    char *clientcmd;
-    char *filename;
-    char buf2[BUFFSIZE];
-    strncpy(buf2, buf, strlen(buf));
-    //printf(MSGSUCC "input: %s, len: %ld" MSGNORM "\n", buff2, strlen(buff2));
-    // get cmd
-    clientcmd = strtok(buf, delim);
-    size_t clicmdlen = strlen(clientcmd);
-    strncpy(argcmd, clientcmd, clicmdlen);
+
+    char* token1 = strtok(buf, delim);
+    size_t tk1len = strlen(token1);
+    strncpy(argcmd, token1, tk1len);
+
     if(strcmp(argcmd, "ls") == 0){
-        filename = strtok(buf2, delim);
-        size_t fnamelen = strlen(filename);
-        strncpy(argfile, filename, fnamelen);
-    } else if(strcmp(argcmd, "exit") == 0){
-        filename = strtok(buf2, delim);
-        size_t fnamelen = strlen(filename);
-        strncpy(argfile, filename, fnamelen);
+        argfile = "ls";
+    } else if (strcmp(argcmd, "exit") == 0) {
+        argfile = "exit";
     } else {
-        int i = 0;
-        // get filename
-        filename = strtok(buf2, delim);
-        size_t fnamelen = strlen(filename);
-        while(filename != NULL){
-            ++i;
-            if(i > 2){
-                error(MSGERRR "Too many arguments" MSGNORM "\n");
-            }
-            size_t fnamelen = strlen(filename);
-            strncpy(argt, filename, strlen(filename));
-            filename = strtok(NULL, delim);
-        }
-        size_t argtlen = strlen(argt);
-        strncpy(argfile, argt, argtlen);
-        memset(argt, 0, BUFFSIZE * (sizeof(char)));
+        char* token2 = strtok(NULL, delim);
+        size_t tk2len = strlen(token2);
+        strncpy(argfile, token2, tk2len);
     }
-}
-
-void clearBuff(char* b){
-    int i;
-    for(i=0; i < BUFFSIZE; i++){
-        b[i] = '\0';
-    }
-}
-
-int sendFile(FILE *fp, char *buffsend, int size){
-    int i;
-    int length;
-    // handle file not found errors
-    if(fp == NULL){
-        strcpy(buffsend, "File not found");
-        length = strlen("File not found");
-        buffsend[length] = EOF;
-        return 1;
-    }
-
-    char nextchar;
-    for(i=0; i<size; i++){
-        nextchar = fgetc(fp);
-        buffsend[i] = nextchar;
-        if (nextchar == EOF){
-            return 1;
-        }
-    }
-    return 0;
-}
-
-int recvFile(char *buffrecv, int size){
-    int i;
-    char nextchar;
-    for(i = 0; i < size; i++){
-        nextchar = buffrecv[i];
-        if(nextchar == EOF){
-            return 1;
-        }
-    }
-    return 0;
 }
 
 int main(int argc, char **argv){
@@ -163,6 +105,16 @@ int main(int argc, char **argv){
     if(sockfd < 0){
         error(MSGERRR "ERROR opening Socket" MSGNORM "\n");
     }
+
+    struct timeval timeout;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
+    if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
+            sizeof(timeout)) < 0)
+    error("setsockopt failed\n");
+    if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
+            sizeof(timeout)) < 0)
+    error("setsockopt failed\n");
 
     // setsockopt
     int optval = 1;
@@ -219,68 +171,77 @@ int main(int argc, char **argv){
                 (struct sockaddr *) &clientaddr, clientlen);
 
     printf(MSGSUCC "Sent to client: %s, n= %d\n" MSGNORM, buff, n);
-
+    printf(MSGTERM "Server Awaiting cmd..." MSGNORM "\n");
     n = recvfrom(sockfd, argb, BUFFSIZE, 0,
                 (struct sockaddr *) &clientaddr, &clientlen);
     errorcheckrecv(n);
-    printf("Echo from client: %s, n = %d \n", argb, n);
+    printf(MSGNORM "Command: " MSGNORM);
+    printf(MSGSUCC "%s" MSGNORM, argb);
+    printf(MSGNORM "  -- Size: " MSGNORM);
+    printf(MSGWARN "%ld" MSGNORM "\n", strlen(argb));
+
     n = sendto(sockfd, acknoledge, sizeof(acknoledge), MSG_WAITALL, 
                 (struct sockaddr *) &clientaddr, clientlen);
     errorchecksend(n);
+
     n = recvfrom(sockfd, argf, BUFFSIZE, 0,
                 (struct sockaddr *) &clientaddr, &clientlen);
     errorcheckrecv(n);
-    printf("Echo from client: %s, n = %d \n", argf, n);
+    printf(MSGNORM "File: " MSGNORM);
+    printf(MSGSUCC "%s" MSGNORM, argf);
+    printf(MSGNORM "  -- Size: " MSGNORM);
+    printf(MSGWARN "%ld" MSGNORM "\n", strlen(argf));
+
+
     n = sendto(sockfd, acknoledge, sizeof(acknoledge), MSG_WAITALL, 
             (struct sockaddr *) &clientaddr, clientlen);
     errorchecksend(n);
+
     FILE *fp;
-    // state machine
+
     do{
         // server handle cmds
         /***********************************/
-        if(strcmp(argb, "put") == 0){
+        if (strcmp(argb, "put") == 0){
             printf(MSGTERM "Server saving file:" MSGNORM " %s \n", argf);
-            /* message handling */
-            fp = fopen(argf, "a");
-            while(1){
-                memset(buff, 0, BUFFSIZE * (sizeof(char)));
-                n = recvfrom(sockfd, buff, BUFFSIZE, 0,
-                            (struct sockaddr*)&clientaddr, &clientlen);
+            char buffgen[BUFFSIZE];
+            int n;
+            while(TRUE){
+                memset(buffgen, 0, BUFFSIZE * (sizeof(char)));
+                n = recvfrom(sockfd, buffgen, BUFFSIZE, 0,
+                        (struct sockaddr *) &clientaddr, &clientlen);
                 errorcheckrecv(n);
-                fprintf(fp, "%s", buff);
-                if(recvFile(buff, sizeof(buff))){
-                    printf(MSGTERM "file saved\n" MSGNORM);
-                    break;
+                if(buffgen[0] == '0'){
+                    fp = fopen(argf, "a");
+                    fwrite(buffgen+1, 1, n-1, fp);
+                    fflush(fp);
+                    fclose(fp);
+                    if(n != BUFFSIZE){
+                        printf(MSGSUCC "File saved" MSGNORM "\n");
+                        break;
+                    }
+                } else {
+                    // we have to resend that packet
+                    buffgen[0] == '1';
+                    n = sendto(sockfd, buffgen, BUFFSIZE, 0,
+                        (struct sockaddr*)&clientaddr, clientlen);
+                    errorchecksend(n);
                 }
             }
-            fclose(fp);
         /***********************************/
         } else if (strcmp(argb, "get") == 0){
             /* message handling */
-            printf(MSGTERM "Server retrieving file: " MSGNORM " %s \n", argf);
-            memset(buff, 0, BUFFSIZE * (sizeof(char)));
-            fp = fopen(argf, "r");
-            if(fp == NULL){
-                printf(MSGERRR "FILE opening failed" MSGNORM "\n");
-                memset(&buff, 0, BUFFSIZE * (sizeof(char)));
-                break;
-            } else {
-                printf(MSGSUCC "FILE opened successfully" MSGNORM "\n");
-            }
-            while(1){
-                if(sendFile(fp, buff, BUFFSIZE)){
-                    sendto(sockfd, buff, BUFFSIZE, 0,
-                            (struct sockaddr *)&clientaddr, clientlen);
-                    break;
-                }
-                sendto(sockfd, buff, BUFFSIZE, 0,
-                            (struct sockaddr *)&clientaddr, clientlen);
-                memset(buff, 0, BUFFSIZE * (sizeof(char)));
-            }
-            if(fp!=NULL){
-                fclose(fp);
-                printf(MSGTERM "File sent" MSGNORM "\n");
+            FILE *fp = fopen(argf, "r");
+            size_t nbytes = 0;
+            int n, packetn;
+            char buffgen[BUFFSIZE];
+            memset(buffgen, 0, BUFFSIZE * (sizeof(char)));
+            while((nbytes = fread(buffgen+1, 1, BUFFSIZE-1, fp)) > 0){
+                buffgen[0] = 'g'; // g for get
+                n = sendto(sockfd, buffgen, nbytes+1, 0,
+                        (struct sockaddr*) &clientaddr, clientlen);
+                errorchecksend(n);
+                printf(MSGWARN "Packet %d Sent" MSGNORM " Size %ld\n", ++packetn, nbytes);
             }
         /***********************************/
         } else if (strcmp(argb, "ls") == 0){
@@ -326,23 +287,31 @@ int main(int argc, char **argv){
             printf(MSGERRR "NOT VALID INPUT" MSGNORM "\n");
             printf(MSGWARN "Commands: put <filename>, get <filename>, ls, exit" MSGNORM "\n");
         }
-
-    clearBuff(buff);
-    memset(buff, 0, BUFFSIZE * (sizeof(char)));
+    printf(MSGTERM "Server Awaiting cmd..." MSGNORM "\n");
+    memset(&buff, 0, BUFFSIZE * (sizeof(char)));
     memset(&argf, 0, BUFFSIZE * (sizeof(char)));
     memset(&argb, 0, BUFFSIZE * (sizeof(char)));
 
     n = recvfrom(sockfd, argb, BUFFSIZE, 0,
                 (struct sockaddr *) &clientaddr, &clientlen);
     errorcheckrecv(n);
-    printf("Echo from client: %s, n = %d \n", argb, n);
+    printf(MSGNORM "Command: " MSGNORM);
+    printf(MSGSUCC "%s" MSGNORM, argb);
+    printf(MSGNORM "  -- Size: " MSGNORM);
+    printf(MSGWARN "%ld" MSGNORM "\n", strlen(argb));
+
     n = sendto(sockfd, acknoledge, sizeof(acknoledge), MSG_WAITALL, 
                 (struct sockaddr *) &clientaddr, clientlen);
     errorchecksend(n);
+    
     n = recvfrom(sockfd, argf, BUFFSIZE, 0,
                 (struct sockaddr *) &clientaddr, &clientlen);
     errorcheckrecv(n);
-    printf("Echo from client: %s, n = %d \n", argf, n);
+    printf(MSGNORM "File: " MSGNORM);
+    printf(MSGSUCC "%s" MSGNORM, argf);
+    printf(MSGNORM "  -- Size: " MSGNORM);
+    printf(MSGWARN "%ld" MSGNORM "\n", strlen(argf));
+
     n = sendto(sockfd, acknoledge, sizeof(acknoledge), MSG_WAITALL, 
             (struct sockaddr *) &clientaddr, clientlen);
     errorchecksend(n);
