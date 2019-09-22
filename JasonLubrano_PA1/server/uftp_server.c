@@ -77,13 +77,17 @@ void buffparse(char *buf, char *argcmd, char *argfile){
     strncpy(argcmd, token1, tk1len);
 
     if(strcmp(argcmd, "ls") == 0){
-        argfile = "ls";
+        argfile = "";
     } else if (strcmp(argcmd, "exit") == 0) {
-        argfile = "exit";
-    } else {
+        argfile = "";
+    } else if ((strcmp(argcmd, "put") == 0) 
+            || (strcmp(argcmd, "get") == 0)
+            || (strcmp(argcmd, "delete") == 0)){
         char* token2 = strtok(NULL, delim);
         size_t tk2len = strlen(token2);
         strncpy(argfile, token2, tk2len);
+    } else {
+        argcmd=""; argfile="";
     }
 }
 
@@ -204,16 +208,14 @@ int main(int argc, char **argv){
         /***********************************/
         if (strcmp(argb, "put") == 0){
             printf(MSGTERM "Server saving file:" MSGNORM " %s \n", argf);
-            char buffgen[BUFFSIZE];
-            int n;
             while(TRUE){
-                memset(buffgen, 0, BUFFSIZE * (sizeof(char)));
-                n = recvfrom(sockfd, buffgen, BUFFSIZE, 0,
+                memset(buff, 0, BUFFSIZE * (sizeof(char)));
+                n = recvfrom(sockfd, buff, BUFFSIZE, 0,
                         (struct sockaddr *) &clientaddr, &clientlen);
                 errorcheckrecv(n);
-                if(buffgen[0] == '0'){
+                if(buff[0] == 'p'){
                     fp = fopen(argf, "a");
-                    fwrite(buffgen+1, 1, n-1, fp);
+                    fwrite(buff+1, 1, n-1, fp);
                     fflush(fp);
                     fclose(fp);
                     if(n != BUFFSIZE){
@@ -221,9 +223,10 @@ int main(int argc, char **argv){
                         break;
                     }
                 } else {
+                    // BONUS: we missed the packet or corrupted
                     // we have to resend that packet
-                    buffgen[0] == '1';
-                    n = sendto(sockfd, buffgen, BUFFSIZE, 0,
+                    buff[0] == 'x';
+                    n = sendto(sockfd, buff, BUFFSIZE, 0,
                         (struct sockaddr*)&clientaddr, clientlen);
                     errorchecksend(n);
                 }
@@ -233,12 +236,11 @@ int main(int argc, char **argv){
             /* message handling */
             FILE *fp = fopen(argf, "r");
             size_t nbytes = 0;
-            int n, packetn;
-            char buffgen[BUFFSIZE];
-            memset(buffgen, 0, BUFFSIZE * (sizeof(char)));
-            while((nbytes = fread(buffgen+1, 1, BUFFSIZE-1, fp)) > 0){
-                buffgen[0] = 'g'; // g for get
-                n = sendto(sockfd, buffgen, nbytes+1, 0,
+            int packetn;
+            memset(buff, 0, BUFFSIZE * (sizeof(char)));
+            while((nbytes = fread(buff+1, 1, BUFFSIZE-1, fp)) > 0){
+                buff[0] = 'g'; // g for get
+                n = sendto(sockfd, buff, nbytes+1, 0,
                         (struct sockaddr*) &clientaddr, clientlen);
                 errorchecksend(n);
                 printf(MSGWARN "Packet %d Sent" MSGNORM " Size %ld\n", ++packetn, nbytes);

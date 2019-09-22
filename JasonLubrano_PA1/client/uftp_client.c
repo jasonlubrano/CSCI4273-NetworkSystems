@@ -125,7 +125,8 @@ int main(int argc, char **argv){
     struct sockaddr_in serveraddr;
     bzero((char *) &serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    bcopy((char*)server->h_addr, (char*)&serveraddr.sin_addr.s_addr, server->h_length);
+    bcopy((char*)server->h_addr,
+        (char*)&serveraddr.sin_addr.s_addr, server->h_length);
     serveraddr.sin_port = htons(portno);
 
     // basic messages for debugging packets
@@ -197,12 +198,11 @@ int main(int argc, char **argv){
         if (strcmp(argb, "put") == 0){
             FILE *fp = fopen(argf, "r");
             size_t nbytes = 0;
-            int n, packetn;
-            char buffgen[BUFFSIZE];
-            memset(buffgen, 0, BUFFSIZE * (sizeof(char)));
-            while((nbytes = fread(buffgen + 1, 1, BUFFSIZE-1, fp)) > 0){
-                buffgen[0] = '0'; // p for put
-                n = sendto(sockfd, buffgen, nbytes+1, 0,
+            int packetn;
+            memset(buff, 0, BUFFSIZE * (sizeof(char)));
+            while((nbytes = fread(buff+1, 1, BUFFSIZE-1, fp)) > 0){
+                buff[0] = 'p';
+                n = sendto(sockfd, buff, nbytes+1, 0,
                         (struct sockaddr*)&serveraddr, serverlen);
                 errorchecksend(n);
                 printf(MSGWARN "Packet %d Sent" MSGNORM " Size %ld\n", ++packetn, nbytes);
@@ -212,22 +212,27 @@ int main(int argc, char **argv){
         } else if (strcmp(argb, "get") == 0){
             printf(MSGTERM "Client fetching file:" MSGNORM " %s \n", argf);
             /* message handling */
-            char buffgen[BUFFSIZE];
-            int n;
             while(TRUE){
-                memset(buffgen, 0, BUFFSIZE * (sizeof(char)));
-                n = recvfrom(sockfd, buffgen, BUFFSIZE, 0,
+                memset(buff, 0, BUFFSIZE * (sizeof(char)));
+                n = recvfrom(sockfd, buff, BUFFSIZE, 0,
                         (struct sockaddr *)&serveraddr, &serverlen);
                 errorcheckrecv(n);
-                if(buffgen[0]='g'){
+                if(buff[0]='g'){
                     fp = fopen(argf, "a");
-                    fwrite(buffgen+1, 1, n-1, fp);
+                    fwrite(buff+1, 1, n-1, fp);
                     fflush(fp);
                     fclose(fp);
                     if(n!=BUFFSIZE){
                         printf(MSGSUCC "File saved" MSGNORM "\n");
                         break;
                     }
+                } else {
+                    // BONUS: we missed the packet or corrupted
+                    // we have to resend that packet
+                    buff[0] == 'x';
+                    n = sendto(sockfd, buff, BUFFSIZE, 0,
+                        (struct sockaddr*)&serveraddr, serverlen);
+                    errorchecksend(n);
                 }
             }
         /***********************************/
