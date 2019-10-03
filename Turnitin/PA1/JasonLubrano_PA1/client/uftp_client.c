@@ -132,7 +132,6 @@ int main(int argc, char **argv){
     // basic messages for debugging packets
     char ready[BUFFSIZE] = "Ready to connect";
     char acknoledge[BUFFSIZE] = "Message received";
-    char ack[BUFFSIZE];
 
     // server setup
     int serverlen = sizeof(serveraddr);
@@ -201,22 +200,12 @@ int main(int argc, char **argv){
             size_t nbytes = 0;
             int packetn;
             memset(buff, 0, BUFFSIZE * (sizeof(char)));
-            memset(ack, 0, BUFFSIZE * (sizeof(char)));
             while((nbytes = fread(buff+1, 1, BUFFSIZE-1, fp)) > 0){
                 buff[0] = 'p';
                 n = sendto(sockfd, buff, nbytes+1, 0,
                         (struct sockaddr*)&serveraddr, serverlen);
                 errorchecksend(n);
                 printf(MSGWARN "Packet %d Sent" MSGNORM " Size %ld\n", ++packetn, nbytes);
-                n = recvfrom(sockfd, ack, BUFFSIZE, 0,
-                        (struct sockaddr *)&serveraddr, &serverlen);
-                errorcheckrecv(n);
-                serverecho(ack);
-                if(ack[0] == 'x'){
-                    printf(MSGWARN "Server did not receive packet %d" MSGNORM "\n", packetn);
-                    n = sendto(sockfd, buff, nbytes+1, 0,
-                            (struct sockaddr*)&serveraddr, serverlen);
-                }
             }
             printf(MSGSUCC "File Sent" MSGNORM "\n");
         /***********************************/
@@ -234,15 +223,9 @@ int main(int argc, char **argv){
                     fflush(fp);
                     fclose(fp);
                     if(n!=BUFFSIZE){
-                        n = sendto(sockfd, acknoledge, sizeof(acknoledge), MSG_WAITALL, 
-                                (struct sockaddr *) &serveraddr, serverlen);
-                        errorchecksend(n);
                         printf(MSGSUCC "File saved" MSGNORM "\n");
                         break;
                     }
-                    n = sendto(sockfd, acknoledge, sizeof(acknoledge), MSG_WAITALL, 
-                            (struct sockaddr *) &serveraddr, serverlen);
-                    errorchecksend(n);
                 } else {
                     // BONUS: we missed the packet or corrupted
                     // we have to resend that packet
@@ -270,10 +253,10 @@ int main(int argc, char **argv){
         /***********************************/
         } else if (strcmp(argb, "delete") == 0){
             /* handle file deletion */
-            printf(MSGWARN "Deleting file:" MSGNORM " %s \n", argf);
+            printf(MSGTERM "Deleting file: %s " MSGNORM "\n", argf);
             n = recvfrom(sockfd, buff, BUFFSIZE, 0,
                         (struct sockaddr *) &serveraddr, &serverlen);
-            printf(MSGTERM "%s" MSGNORM "\n", buff);
+            printf(MSGWARN "%s" MSGNORM "\n", buff);
             memset(buff, 0, BUFFSIZE * (sizeof(char)));
         /***********************************/
         } else {
