@@ -1,0 +1,48 @@
+Jason Lubrano
+CSCI4273 - Ha - Network Systems
+Programming Assignment 1
+----------------------------------------------
+
+1. MAKE
+In directory: JasonLubrano_PA1
+
+$ make
+
+# makes all the executable files for the CLIENT and the SERVER
+----------------------------------------------
+
+2. SERVER
+Usage:
+$ ./server <port>
+Example:
+$ ./server 3000
+
+Explination:
+Server starts using the example code.
+Server waits for a client to send the ready message.
+After handshake, server is ready to receive the first command.
+Server receive the filename right after.
+Server matches the command with the handler.
+Commands put, get, delete all require a filename.
+ls and exit do not require a filename, but one is sent anyway.
+If a nonvalid command is sent, server alerts. (client will already know)
+After handling, ready to receive another command and filename.
+Upon exit command, server closes the socket.
+Program closes.
+----------------------------------------------
+
+3. CLIENT
+Usage:
+$ ./client <host> <port>
+example:
+$ ./client localhost 3000
+Client starts using example code.
+Client takes the command and filename arguemnt from user.
+Client parses into seperate buffers and sends to server.
+Handling is done for each command.
+Commands put, get, delete all require a filename.
+ls and exit do not require a filename, but one is sent anyway.
+If command argument is not valid, client alerts user.
+After handling, ready to receive another command and filename.
+Upon exit, the exit message is sent to the server.
+Program closes.
