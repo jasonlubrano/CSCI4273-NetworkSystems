@@ -28,6 +28,8 @@
 int open_listenfd(int port);
 void echo(int connfd);
 void *thread(void *vargp);
+int is_valid_URL(const char* urlarg);
+int is_valid_VER(const char* verarg);
 
 int main(int argc, char **argv) 
 {
@@ -68,46 +70,100 @@ void echo(int connfd)
     size_t n;
     char buf[MAXLINE];
     char tribuf[MAXLINE];
-    char met[SHORTBUF];
-    char url[SHORTBUF];
-    char ver[SHORTBUF];
+    char metbuf[SHORTBUF];
+    char urlbuf[MAXLINE];
+    char verbuf[SHORTBUF];
+    char ftype[SHORTBUF];
     char httpmsggiven[]="HTTP/1.1 200 Document Follows\r\nContent-Type:text/html\r\nContent-Length:32\r\n\r\n<html><h1>Hello CSCI4273 Course!</h1>";
     bzero(buf, MAXLINE);
-    bzero(met, SHORTBUF);
-    bzero(url, SHORTBUF);
-    bzero(ver, SHORTBUF);
+    bzero(metbuf, SHORTBUF);
+    bzero(urlbuf, MAXLINE);
+    bzero(verbuf, SHORTBUF);
 
     n = read(connfd, buf, MAXLINE);
     printf(MSGSUCC "server received the following request:\n%s" MSGSUCC "\n", buf);
-    strtok(met, buf);
+    
+    printf(MSGWARN "PARSING" MSGNORM "\n");
+    char* token1 = strtok(buf, " ");
+    size_t tk1len = strlen(token1);
+    strncpy(metbuf, token1, tk1len);
 
+    char* token2 = strtok(NULL, " ");
+    size_t tk2len = strlen(token2); 
+    strncpy(urlbuf, token2, tk2len);
+
+    char* token3 = strtok(NULL, "\r\n");
+    size_t tk3len = strlen(token3);
+    strncpy(verbuf, token3, tk3len);
+    
     bzero(buf, MAXLINE);
     
     printf(MSGSUCC "GETTING FILE" MSGNORM "\n");
+    
     FILE *fp = NULL;
-    if(fp = fopen("index.html", "rb")) {
-        printf(MSGSUCC "READING FILE" MSGNORM "\n");
-        fseek(fp, 0L, SEEK_END);
-        n = ftell(fp);
-        rewind(fp);
-        printf(MSGSUCC "FILE READ" MSGNORM "\n");
-    } else {
-        printf(MSGERRR "FILE DOES NOT EXIST" MSGNORM "\n");
-    }
-    char *filebuff = malloc(n);
-    fread(filebuff, 1, n, fp);
-    
-    char tempbuff[MAXLINE];
-    sprintf(tempbuff, "HTTP/1.1 200 Document Follows\r\nContent-Type:text/html\r\nContent-Length:%ld\r\n\r\n", n);
-    
-    char *httpmsg = malloc(n + strlen(tempbuff));
-    printf(MSGERRR "httpmsg: %s" MSGNORM "\n", httpmsg);
-    sprintf(httpmsg, "%s", tempbuff);
-    memcpy(httpmsg + strlen(tempbuff), filebuff, n);
-    n += strlen(tempbuff);
 
-    printf(MSGTERM"server returning a http message with the following content.\n%s" MSGNORM "\n", httpmsg);
-    write(connfd, httpmsg, n);    
+    if(is_valid_URL(urlbuf) && is_valid_VER(verbuf)){
+        printf(MSGSUCC "VALID" MSGNORM "\n");
+        if(!strcmp(urlbuf, "/")){
+            printf("Default webpage\n");
+            fp = fopen("index.html", "rb");
+            printf(MSGSUCC "READING FILE" MSGNORM "\n");
+            fseek(fp, 0L, SEEK_END);
+            n = ftell(fp);
+            rewind(fp);
+            printf(MSGSUCC "FILE READ" MSGNORM "\n");
+        } else if(fp = fopen("index.html", "rb")) {
+            printf(MSGSUCC "READING FILE" MSGNORM "\n");
+            fseek(fp, 0L, SEEK_END);
+            n = ftell(fp);
+            rewind(fp);
+            printf(MSGSUCC "FILE READ" MSGNORM "\n");
+        } else {
+            printf(MSGERRR "FILE DOES NOT EXIST" MSGNORM "\n");
+        }
+        
+        char *filebuff = malloc(n);
+        fread(filebuff, 1, n, fp);
+        
+        char tempbuff[MAXLINE];
+        sprintf(tempbuff, "HTTP/1.1 200 Document Follows\r\nContent-Type:text/html\r\nContent-Length:%ld\r\n\r\n", n);
+        
+        char *httpmsg = malloc(n + strlen(tempbuff));
+        printf(MSGERRR "httpmsg: %s" MSGNORM "\n", httpmsg);
+        sprintf(httpmsg, "%s", tempbuff);
+        memcpy(httpmsg + strlen(tempbuff), filebuff, n);
+        n += strlen(tempbuff);
+
+        //printf(MSGTERM"server returning a http message with the following content.\n%s" MSGNORM "\n", httpmsg);
+        write(connfd, httpmsg, n);   
+    } else {
+        printf(MSGERRR "NOT VALID" MSGNORM "\n");
+    } 
+}
+
+int is_valid_URL(const char* urlarg){
+    int len_urlarg = strlen(urlarg);
+    if ((urlarg != NULL) && (urlarg[0] == '\0')) {
+        printf("urlarg is empty\n");
+        return 0;
+    } else {
+        return 1;
+    }
+    
+}
+
+int is_valid_VER(const char* verarg){
+    if(strlen(verarg) == 0) return 0;
+    if ((verarg != NULL) && (verarg[0] == '\0')) {
+        printf("verarg is empty\n");
+        return 0;
+    } else if(strcmp(verarg, "HTTP/1.1") == 0) {
+        return 1;
+    } else if(strcmp(verarg, "HTTP/1.0") == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 /* 
@@ -142,4 +198,3 @@ int open_listenfd(int port)
         return -1;
     return listenfd;
 } /* end open_listenfd */
-
