@@ -70,25 +70,29 @@ void echo(int connfd)
 {
     size_t n;
     char buf[MAXLINE];
-    char tribuf[MAXLINE];
     char metbuf[SHORTBUF];
     char urlbuf[MAXLINE];
     char doturlbuf[MAXLINE];
-    char contenttype[SHORTBUF];
     char verbuf[SHORTBUF];
     char ftype[SHORTBUF];
-    char *dot = ".";
+    char contenttype[SHORTBUF];
     char tempstr[MAXLINE];
+    char *dot = ".";
     char httpmsggiven[]="HTTP/1.1 200 Document Follows\r\nContent-Type:text/html\r\nContent-Length:32\r\n\r\n<html><h1>Hello CSCI4273 Course!</h1>";
-    bzero(buf, MAXLINE);
-    bzero(metbuf, SHORTBUF);
-    bzero(urlbuf, MAXLINE);
-    bzero(verbuf, SHORTBUF);
     int is_error500 = 0;
     char error500msg[]="HTTP/1.1 500 Internal Server Error\r\nContent-Type:text/plain\r\nContent-Length:0\r\n\r\n";
     int is_validurl = 0;
     int is_validver = 0;
 
+    bzero(buf, MAXLINE);
+    bzero(metbuf, SHORTBUF);
+    bzero(urlbuf, MAXLINE);
+    bzero(doturlbuf, MAXLINE);
+    bzero(verbuf, SHORTBUF);
+    bzero(ftype, SHORTBUF);
+    bzero(contenttype, SHORTBUF);
+    bzero(tempstr, MAXLINE);
+    
     n = read(connfd, buf, MAXLINE);
     printf(MSGSUCC "server received the following request:\n%s" MSGSUCC "\n", buf);
     
@@ -212,12 +216,15 @@ void echo(int connfd)
         n = strlen(error500msg);
         write(connfd, error500msg, n);
     }
+    
     bzero(buf, MAXLINE);
     bzero(metbuf, SHORTBUF);
     bzero(urlbuf, MAXLINE);
     bzero(doturlbuf, MAXLINE);
     bzero(verbuf, SHORTBUF);
     bzero(ftype, SHORTBUF);
+    bzero(contenttype, SHORTBUF);
+    bzero(tempstr, MAXLINE);
 }
 
 const char *get_fname_ext(const char *fname) {
