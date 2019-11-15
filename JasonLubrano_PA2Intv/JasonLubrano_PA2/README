@@ -1,0 +1,28 @@
+Jason Lubrano
+CSCI4273 - Ha - Network Systems
+Programming Assignment 2
+--------------------------------------------------------------------------------------------
+
+1. MAKE
+Located in directory: JasonLubrano_PA2/server
+
+Example:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/server$ make
+
+Makes the executable files for tcpechoserver.c
+Makes server
+--------------------------------------------------------------------------------------------
+
+2. SERVER
+Usage:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/server/www$ ../server <port>
+
+Example:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/server/www$ ../server 8080
+
+Explination:
+Server starts using the example code.
+Server receives requests from the browser.
+Server handles request by parsing the information.
+Server retrieves the information from the webroot.
+Server sends information to the browser to display for a user.
