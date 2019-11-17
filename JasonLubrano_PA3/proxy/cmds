@@ -1,0 +1,36 @@
+(base) gnomy@gnomypc:~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA3/proxy$
+	./webproxy 8080
+
+
+(base) gnomy@gnomypc:~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA3/proxy$ telnet localhost 8080
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+GET http://www.google.com HTTP/1.0
+HTTP/1.1 500 Internal Server Error
+Content-Type:text/plain
+Content-Length:0
+
+Connection closed by foreign host.
+
+
+#Makefile
+all: ./proxyserver.c
+	gcc proxyserver.c -pthread -g -o ./webproxy
+
+clean:
+	$(RM) *.o ./webproxy
+
+
+all: ./proxyserver.c
+	gcc -Wall proxyserver.c -o ./webproxy -lcrypto -lssl
+
+clean:
+	$(RM) *.o ./webproxy
+
+
+all: ./proxyserver.c
+	gcc proxyserver.c -o ./webproxy -lcrypto -lssl
+
+clean:
+	$(RM) *.o ./webproxy

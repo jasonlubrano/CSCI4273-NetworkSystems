@@ -17,7 +17,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
-#include <openssl/md5.h>
+// #include <openssl/md5.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -57,10 +57,6 @@ int send_bad_request(int connfd, char** bufferr, int type);
 FILE * search_dir_for_file(const char* filename);
 int send_file_from_cache(int address, FILE* source_file);
 char *md5sum_hash_file(const char* filename, size_t len);
-int get_data_from_server(int connfd, FILE* filename, char* endfox, char** argHTTP);
-char* get_host_name_from_url(int* urlstart, const char* urlbuf);
-struct hostent* get_host_entry(char* urlbuf);
-int connect_server_to_proxy(struct in_addr* inaddr);
 
 
 /* global timeout variable */
@@ -71,8 +67,7 @@ struct timeval timeout;
 int main(int argc, char **argv) 
 {
     int listenfd, clientfd, *connfdp, port, clientlen=sizeof(struct sockaddr_in);
-    struct sockaddr_in servaddr;
-    // struct sockaddr_in cliaddr;
+    struct sockaddr_in servaddr, cliaddr;
     pthread_t tid; 
 
     if (argc == 2) {
@@ -123,11 +118,10 @@ void * thread(void * vargp)
 
 /* have to tell if the URL or VER is bad */
 int send_bad_request(int connfd, char** bufferr, int type){
-    // char buff[MAXBUF];
-    // char cont[MAXBUF];
-    //int errormsglen;
-    //bzero(buff, MAXBUF);
-    if(VERBOSE){printf(MSGERRR "...BAD Request being sent...");}
+    char buff[MAXBUF];
+    char cont[MAXBUF];
+    int errormsglen;
+    bzero(buff, MAXBUF);
 }
 
 
@@ -136,6 +130,7 @@ int send_bad_request(int connfd, char** bufferr, int type){
  */
 void runproxy(int connfd) 
 {
+    size_t n;
     char buf[MAXLINE];
     char getbuf[SHORTBUF];
     char urlbuf[MAXLINE];
@@ -144,9 +139,10 @@ void runproxy(int connfd)
     char ftype[SHORTBUF];
     char contenttype[SHORTBUF];
     char tempstr[MAXLINE];
-    // char *dot = ".";
-    // char httpmsggiven[]="HTTP/1.1 200 Document Follows\r\nContent-Type:text/html\r\nContent-Length:32\r\n\r\n<html><h1>Hello CSCI4273 Course!</h1>";
-    // char error400msg[]="HTTP/1.1 500 Internal Server Error\r\nContent-Type:text/plain\r\nContent-Length:0\r\n\r\n";
+    char *dot = ".";
+    char httpmsggiven[]="HTTP/1.1 200 Document Follows\r\nContent-Type:text/html\r\nContent-Length:32\r\n\r\n<html><h1>Hello CSCI4273 Course!</h1>";
+    int is_error400 = 0;
+    char error400msg[]="HTTP/1.1 500 Internal Server Error\r\nContent-Type:text/plain\r\nContent-Length:0\r\n\r\n";
     int is_validurl = 0;
     int is_validver = 0;
 
@@ -159,30 +155,26 @@ void runproxy(int connfd)
     bzero(contenttype, SHORTBUF);
     bzero(tempstr, MAXLINE);
     
-    size_t n = read(connfd, buf, MAXLINE);
+    n = read(connfd, buf, MAXLINE);
     printf(MSGSUCC "server received the following request:\n%s" MSGNORM "\n", buf);
     
     if(VERBOSE){printf(MSGTERM "PARSING REQUEST: %s" MSGNORM "\n", buf);}
+
     // GET
     char* token1 = strtok(buf, " ");
     size_t tk1len = strlen(token1);
     strncpy(getbuf, token1, tk1len);
     printf(MSGTERM "getbuf: %s" MSGNORM "\n", getbuf);
-    // URL
+
     char* token2 = strtok(NULL, " ");
     size_t tk2len = strlen(token2); 
     strncpy(urlbuf, token2, tk2len);
     printf(MSGTERM "urlbuf: %s" MSGNORM "\n", urlbuf);
-    // VER
+
     char* token3 = strtok(NULL, "\r\n");
     size_t tk3len = strlen(token3);
     strncpy(verbuf, token3, tk3len);
     printf(MSGTERM "verbuf: %s" MSGNORM "\n", verbuf);
-    // argument array if i ever need to send all of them at once.
-    char* argHTTP[3];
-    argHTTP[0] = getbuf;
-    argHTTP[1] = urlbuf;
-    argHTTP[2] = verbuf;
 
     bzero(buf, MAXLINE);
     
@@ -204,6 +196,7 @@ void runproxy(int connfd)
     } else {
         if(VERBOSE){printf(MSGTERM "...Invalid HTTP version" MSGNORM "\n");}
         is_validver = 0;
+        is_error400 = 1;
     }
 
     if(VERBOSE){printf(MSGTERM "...Checking URL validity..." MSGNORM "\n");}
@@ -213,17 +206,24 @@ void runproxy(int connfd)
     } else {
         if(VERBOSE){printf(MSGTERM "...Invalid URL" MSGNORM "\n");}
         is_validurl = 0;
+        is_error400 = 1;
     }
 
-    if(is_validurl==1 && is_validver==1){
+    if(!is_valid_VER){
+        // send version error message
+        // send_bad_request(connfd, verbuf, 1);
+    } else if(!is_valid_URL){
+        // send url error message
+        // send_bad_request(connfd, urlbuf, 1);
+    }
+
+    if(is_validurl && is_validver){
         char * url_md5sum = md5sum_hash_file(urlbuf, strlen(urlbuf)); // hash the urlbuff
         char url_chache[MAXBUF];
         memset(url_chache, 0, MAXBUF);
         sprintf(url_chache, "%s.cache", url_md5sum);
-        file_source = search_dir_for_file(url_chache);
-        if(file_source){
+        if(file_source = search_dir_for_file(url_chache)){
             // found the file, great, send it
-            if(VERBOSE){printf(MSGTERM "...Hash File Found");}
             send_file_from_cache(connfd, file_source);
             fclose(file_source);
             // return 0;
@@ -234,16 +234,15 @@ void runproxy(int connfd)
         for(i = 0;;i++){ if(buf[i] == '\n'){ break; }}
 
         // pretty much the working part of the project right here.
-        get_data_from_server(connfd, file_source, buf+i+1, argHTTP);
-        // TO DO finish this write up at the end
+        // get_data_from_server();
 
         if(file_source){ fclose(file_source);}
 
         // return 0;
 
-    } else if(is_validver == 0) {
+    } else if(!is_valid_VER) {
         // send invalid ver err
-    } else if(is_validurl == 0) {
+    } else if(!is_valid_URL) {
         // send invalid url error
     } else {
         // some other error?
@@ -260,168 +259,8 @@ void runproxy(int connfd)
 }
 
 
-/* called multiple times to connect a single server to the proxy */
-int connect_server_to_proxy(struct in_addr* inaddr){
-    if(VERBOSE){printf(MSGTERM "...creating connection..." MSGNORM "\n");}
-    struct sockaddr_in sockaddrin_sk2;
-    int sk2;
-    int sk2_length;
-
-    if((sk2 = socket(AF_INET, SOCK_STREAM, 0)) < 0) { printf(MSGERRR "CREATING CONNECTION: CONNECTION FAILURE" MSGNORM "\n"); return -1;}
-
-    sk2_length = sizeof(sockaddrin_sk2);
-    memset(&sockaddrin_sk2, 0, sk2_length);
-    sockaddrin_sk2.sin_family = AF_INET;
-    sockaddrin_sk2.sin_addr = *inaddr;
-    sockaddrin_sk2.sin_port = htons(atoi("80"));
-
-    if(VERBOSE){printf(MSGTERM "...creating socket..." MSGNORM "\n");}
-    if(connect(sk2, (struct sockaddr *)& sockaddrin_sk2, sk2_length) < 0){ printf(MSGERRR "CREATING CONNECTION: HOSTNAME FAILURE ERROR" MSGNORM "\n"); return -1;}
-
-    return sk2;
-}
-
-
-/* get data from server */
-int get_data_from_server(int connfd, FILE* filename, char* endfox, char** argHTTP){
-    int flag;
-    int serverfd;
-    int i, b_recv;
-    char buff[MAXBUF];
-    struct hostent* host_entry;
-    struct in_addr** in_addrs;
-    host_entry = get_host_entry(argHTTP[1]);
-    if(!host_entry) {
-        send_bad_request(connfd, argHTTP, 4);
-        return 0;
-    }
-    in_addrs = (struct in_addr**) host_entry->h_addr_list;
-    i = 0;
-    flag = 0;
-
-    // request from target servers
-    while(in_addrs[i] != NULL) {
-        if(VERBOSE){printf(MSGTERM "...Connecting Proxy to Server..." MSGNORM "\n");}
-        serverfd = connect_server_to_proxy(in_addrs[i]);
-        // to do connectRoutine -> connect_server_to_proxy
-        // make header and function
-        i++;
-        if(serverfd < 0) {
-            continue;
-        }
-
-        if(send_request_to_server(serverfd, argHTTP, endfox) <= 0) {
-            if(VERBOSE){printf(MSGTERM "...Sending request to Server..." MSGNORM "\n");}
-            // to do sendRequest -> send_request_to_server
-            // make header and function
-            close(serverfd);
-            continue;
-        }
-
-        if(is_timer_expired(serverfd) <= 0) {
-            // to do Select -> is_timer_expired
-            // make header and function
-            if(VERBOSE){printf(MSGTERM "...Server timer expired..." MSGNORM "\n");}
-            close(serverfd);
-            continue;
-        }
-
-        // receive data
-        while(1) {
-            memset(buff, 0, MAXBUF);
-            b_recv = 0;
-            b_recv = read(serverfd, buff, MAXBUF);
-            if(b_recv==0) break;
-            write(connfd, buff, b_recv);
-            fwrite(buff, 1, b_recv, filename);
-        }
-        flag = 1;
-        close(serverfd);
-        break;
-    }
-
-    // no data are sent
-    if(!flag) {
-        send_bad_request(connfd, argHTTP, 4);
-    }
-    return 0;
-}
-
-
-/* get/return the host entry */
-struct hostent* get_host_entry(char* urlbuf){
-    struct hostent *host_entry;
-
-    char *host_name = get_host_name_from_url(NULL, urlbuf);
-    if(VERBOSE){printf(MSGTERM "...host_name: %s" MSGNORM "\n", host_name);}
-    if(VERBOSE){printf(MSGTERM "...Getting host by name, writeup function..." MSGNORM "\n");}
-    if(!(host_entry = gethostbyname(host_name))) {
-        if(VERBOSE){printf(MSGERRR "...ERROR: geting host name failed. returning null." MSGNORM "\n");}
-        return NULL;
-    }
-    free(host_name);
-
-    return host_entry;
-}
-
-
-/* get the host name from the URL */
-char* get_host_name_from_url(int* urlstart, const char* urlbuf){
-    char* host_name = NULL;
-    int ptr_start=0;
-    int ptr_end;
-    int counter = 0;
-    int length = 0;
-    for(ptr_end = 0;;ptr_end++) {
-        if(urlbuf[ptr_end] == '\0'){ break; }
-        if(urlbuf[ptr_end] == '/' ){ counter++; }
-        if(!ptr_start && counter == 2){ ptr_start = ptr_end+1; }
-        if(counter == 3){ break; }
-    }
-    if(urlstart) {
-        if(urlbuf[ptr_end] == '\0'){ *urlstart = 0; }
-        else{ *urlstart = ptr_end; }
-        return NULL;
-    }
-    length = ptr_end - ptr_start + 1;
-    host_name = calloc(1, length);
-    memcpy(host_name, urlbuf + ptr_start, length-1);
-    return host_name;
-}
-
-
-/* function for hashing the file */
-char * md5sum_hash_file(const char *fdata, size_t flen){
+char * md5sum_hash_file(const char *filename, size_t len){
     // HASH the thing
-    if(VERBOSE){printf(MSGTERM "...Hashing data..." MSGNORM "\n");}
-    size_t md5sum_length;
-    char * hash_final;
-    unsigned char md5sum[MD5_DIGEST_LENGTH];
-    MD5_CTX md5ctx;
-    memset(md5sum, 0, MD5_DIGEST_LENGTH);
-
-    MD5_Init(&md5ctx);
-    MD5_Update(&md5ctx, fdata, flen);
-
-    if(!MD5_Final(md5sum, &md5ctx)){
-        fprintf(stderr, "ERROR hashing md5sum \n");
-        return NULL;
-    }
-
-    md5sum_length = MD5_DIGEST_LENGTH<<1+1;
-    hash_final = malloc(md5sum_length);
-    memset(hash_final, 0, md5sum_length);
-
-    int i = 0;
-    for(i=0; i<MD5_DIGEST_LENGTH; i++){
-        sprintf(&hash_final[i*2], "%02x", (unsigned int)md5sum[i]);
-    }
-
-    if(VERBOSE){printf(MSGTERM "md5sum: %s" MSGNORM "\n", md5sum);}
-    if(VERBOSE){printf(MSGTERM "hash_final: %s" MSGNORM "\n", hash_final);}
-
-    return hash_final;
-
 }
 
 
@@ -434,14 +273,11 @@ int send_file_from_cache(int address, FILE* source_file){
     int getting_data = 1;
     while(getting_data){
         data_read = fread(buff, 1, MAXBUF, source_file);
-        
         if(data_read <= 0) {return data_read;}
-
         write(address, buff, data_read);
         count = data_read;
-        
         if(data_read < MAXBUF){break;}
-
+        // clear to go again
         memset(buff, 0, MAXBUF);
         data_read = 0;
     }
@@ -481,7 +317,7 @@ const char *get_fname_ext(const char *fname) {
 
 /* test whether the URL is valid */
 int is_valid_URL(const char* urlarg){
-    // int len_urlarg = strlen(urlarg);
+    int len_urlarg = strlen(urlarg);
     if ((urlarg != NULL) && (urlarg[0] == '\0')) {
         printf("urlarg is empty\n");
         return 0;
