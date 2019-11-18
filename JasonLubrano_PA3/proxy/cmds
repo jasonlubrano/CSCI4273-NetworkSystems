@@ -2,16 +2,30 @@
 	./webproxy 8080
 
 
-(base) gnomy@gnomypc:~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA3/proxy$ telnet localhost 8080
+(base) gnomy@gnomypc:~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA3/proxy$
+	telnet localhost 8080
 Trying 127.0.0.1...
 Connected to localhost.
 Escape character is '^]'.
+
 GET http://www.google.com HTTP/1.0
-HTTP/1.1 500 Internal Server Error
-Content-Type:text/plain
-Content-Length:0
+GET http://netsys.cs.colorado.edu HTTP/1.0
+GET http://www.yahoo.com HTTP/1.0
+GET http://www.twitter.com HTTP/1.0
+GET http://www.bing.com HTTP/1.0
+GET https://www.whitehouse.gov/ HTTP/1.0
+GET https://en.wikipedia.org/wiki/Web_server HTTP/1.0
+
 
 Connection closed by foreign host.
+
+
+
+
+I was banned from twitter so they get black listed lol.
+
+
+
 
 
 #Makefile

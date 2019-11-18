@@ -24,6 +24,7 @@
 #include <pthread.h>
 #include <dirent.h>
 #include <ctype.h>
+#include <errno.h>
 
 
 /* maximum lengths */
@@ -47,23 +48,31 @@
 
 
 /* Functions used throughout */
-int open_listenfd(int port, struct timeval timeout, struct sockaddr_in address);
 void runproxy(int connfd);
-void *thread(void *vargp);
+void* thread(void *vargp);
+void check_ipbuff(char *ipbuff);
+int is_timer_expired(int socketfd);
+void check_host_name(int host_name);
 int is_valid_URL(const char* urlarg);
 int is_valid_VER(const char* verarg);
-const char *get_fname_ext(const char *fname);
-int send_bad_request(int connfd, char** bufferr, int type);
-FILE * search_dir_for_file(const char* filename);
-int send_file_from_cache(int address, FILE* source_file);
-char *md5sum_hash_file(const char* filename, size_t len);
-int get_data_from_server(int connfd, FILE* filename, char* endfox, char** argHTTP);
-char* get_host_name_from_url(int* urlstart, const char* urlbuf);
+int is_url_blacklisted(char* urlbuf);
+const char* get_fname_ext(const char *fname);
 struct hostent* get_host_entry(char* urlbuf);
+FILE* search_dir_for_file(const char* filename);
+void check_host_entry(struct hostent * host_entry);
 int connect_server_to_proxy(struct in_addr* inaddr);
+int send_file_from_cache(int address, FILE* source_file);
+char* md5sum_hash_file(const char* filename, size_t len);
+int URL_error_message_handler(int serverfd, char* argHTTP);
+int VER_error_message_handler(int serverfd, char* argHTTP);
+char* get_host_name_from_url(int* urlstart, const char* urlbuf);
+int blacklist_error_message_handler(int serverfd, char* urlbuff);
+int send_request_to_server(int serverfd, char** argHTTP, char* endfox);
+int open_listenfd(int port, struct timeval timeout, struct sockaddr_in address);
+int get_data_from_server(int connfd, FILE* filename, char* endfox, char** argHTTP);
 
 
-/* global timeout variable */
+/* global connection timeout variable */
 struct timeval timeout;
 
 
@@ -110,7 +119,7 @@ void error(char *msg){
 
 
 /* thread routine */
-void * thread(void * vargp) 
+void* thread(void * vargp) 
 {  
     int connfd = *((int *)vargp);
     pthread_detach(pthread_self()); 
@@ -118,16 +127,6 @@ void * thread(void * vargp)
     runproxy(connfd);
     close(connfd);
     return NULL;
-}
-
-
-/* have to tell if the URL or VER is bad */
-int send_bad_request(int connfd, char** bufferr, int type){
-    // char buff[MAXBUF];
-    // char cont[MAXBUF];
-    //int errormsglen;
-    //bzero(buff, MAXBUF);
-    if(VERBOSE){printf(MSGERRR "...BAD Request being sent...");}
 }
 
 
@@ -186,14 +185,7 @@ void runproxy(int connfd)
 
     bzero(buf, MAXLINE);
     
-    // watch for black list
-    // connect to http server
-    // get data from server
-    // spit data out
-    // cache data
-    // on timeout, delete data
-
-    if(VERBOSE){printf(MSGTERM "CHECKING BLACKLIST" MSGNORM "\n");}
+    if(VERBOSE){printf(MSGTERM "...checking blacklist" MSGNORM "\n");}
 
     FILE *file_source = NULL;
     
@@ -202,7 +194,7 @@ void runproxy(int connfd)
         if(VERBOSE){printf(MSGTERM "...Valid HTTP version" MSGNORM "\n");}
         is_validver = 1;
     } else {
-        if(VERBOSE){printf(MSGTERM "...Invalid HTTP version" MSGNORM "\n");}
+        if(VERBOSE){printf(MSGWARN "...Invalid HTTP version" MSGNORM "\n");}
         is_validver = 0;
     }
 
@@ -211,11 +203,25 @@ void runproxy(int connfd)
         if(VERBOSE){printf(MSGTERM "...Valid URL" MSGNORM "\n");}
         is_validurl = 1;
     } else {
-        if(VERBOSE){printf(MSGTERM "...Invalid URL" MSGNORM "\n");}
+        if(VERBOSE){printf(MSGWARN "...Invalid URL" MSGNORM "\n");}
         is_validurl = 0;
     }
 
-    if(is_validurl==1 && is_validver==1){
+    if(VERBOSE){printf(MSGTERM "...Comparing URL against blacklisted sites..." MSGNORM "\n");}
+    int is_urlblacklisted;
+    if(is_url_blacklisted(urlbuf)){
+        // is_url_blacklisted returned 1 for yes
+        if(VERBOSE){printf(MSGWARN "...URL blacklisted" MSGNORM "\n");}
+        is_urlblacklisted = 1;
+    } else {
+        // returned 0 for no
+        if(VERBOSE){printf(MSGTERM "...URL not blacklisted" MSGNORM "\n");}
+        is_urlblacklisted = 0;
+    }
+
+
+    if(is_validurl==1 && is_validver==1 && is_urlblacklisted==0){
+        // check for blacklisted sites here
         char * url_md5sum = md5sum_hash_file(urlbuf, strlen(urlbuf)); // hash the urlbuff
         char url_chache[MAXBUF];
         memset(url_chache, 0, MAXBUF);
@@ -239,14 +245,18 @@ void runproxy(int connfd)
 
         if(file_source){ fclose(file_source);}
 
-        // return 0;
-
     } else if(is_validver == 0) {
         // send invalid ver err
+        if(VERBOSE){printf(MSGWARN "...Invalid VER: %s" MSGNORM "\n", verbuf);}
+        VER_error_message_handler(connfd, verbuf);
     } else if(is_validurl == 0) {
         // send invalid url error
+        if(VERBOSE){printf(MSGWARN "...Invalid URL: %s" MSGNORM "\n", urlbuf);}
+        URL_error_message_handler(connfd, urlbuf);
     } else {
         // some other error?
+        if(VERBOSE){printf(MSGWARN "...URL Blacklisted: %s" MSGNORM "\n", urlbuf);}
+        blacklist_error_message_handler(connfd, urlbuf);
     }
     
     bzero(buf, MAXLINE);
@@ -260,9 +270,145 @@ void runproxy(int connfd)
 }
 
 
+/* check hostname */
+void check_host_name(int host_name){
+    if(VERBOSE){printf(MSGNORM "Checking hostname..." MSGNORM "\n");}
+    if(host_name == 1){
+        if(VERBOSE){printf(MSGERRR "Hostname" MSGNORM "\n");}
+        error(MSGERRR "Hostname" MSGNORM "\n");
+        exit(1);
+    }
+}
+
+
+/* validates the host entry */
+void check_host_entry(struct hostent * host_entry){
+    if(VERBOSE){printf(MSGNORM "Checking host entry..." MSGNORM "\n");}
+    if (host_entry == NULL){ 
+        if(VERBOSE){printf(MSGERRR "Hostentry" MSGNORM "\n");}
+        error(MSGERRR "Hostentry" MSGNORM "\n");
+        exit(1);
+    }
+}
+
+
+/* checks the ip address is valid */
+void check_ipbuff(char *ipbuff){ 
+    if(VERBOSE){printf(MSGNORM "Checking ip buff..." MSGNORM "\n");}
+    if (NULL == ipbuff){ 
+        if(VERBOSE){printf(MSGERRR "ipbuff" MSGNORM "\n");}
+        error(MSGERRR "ipbuff" MSGNORM "\n");
+        exit(1);
+    } 
+}
+
+
+/* check for blacklisted sites here */
+int is_url_blacklisted(char* urlbuff){
+    if(VERBOSE){printf(MSGNORM "Checking blacklisted sites..." MSGNORM "\n");}
+    char site[SHORTBUF];
+    char *ipbuff;
+    char hostbuff[SHORTBUF];
+    int host_name;
+    struct hostent* host_entry;
+    FILE *fileptr = fopen("blacklist", "r");
+
+    int url_host_name;
+    char *url_ipbuff;
+    struct hostent* url_host_entry;
+    /*
+    url_host_name = gethostname(urlbuff, sizeof(urlbuff));
+    check_host_name(url_host_name);
+    url_host_entry = gethostbyname(urlbuff);
+    check_host_entry(url_host_entry);
+    url_ipbuff = inet_ntoa(*((struct in_addr*)url_host_entry->h_addr_list[0]));
+    if(VERBOSE){printf(MSGTERM "URL Hostname: %s" MSGNORM "\n", urlbuff);}
+    if(VERBOSE){printf(MSGTERM "URL IP: %s" MSGNORM "\n", url_ipbuff);}
+    */
+    if(VERBOSE){printf(MSGSUCC "accessedsite: %s" MSGNORM "\n", get_host_name_from_url(NULL, urlbuff));}
+    while(fgets(site, sizeof(site), fileptr)){
+        if(VERBOSE){printf(MSGWARN "blacklisted site: %s" MSGNORM "\n", site);}
+        if(!strcmp(get_host_name_from_url(NULL, urlbuff), site)) {
+            // direct comparison first
+            printf(MSGERRR "Site was on blacklist" MSGNORM "\n");
+            return 1;
+        }
+        host_name = gethostname(site, sizeof(site));
+        check_host_name(host_name);
+        
+        
+    }
+    
+    fclose(fileptr);
+    return 0;
+}
+
+
+/* sends out the blacklisted message */
+int blacklist_error_message_handler(int serverfd, char* urlbuff){
+    if(VERBOSE){printf(MSGWARN "ERROR 403 FORBIDDEN..." MSGNORM "\n");}
+    char genbuff[MAXBUF];
+    char errorline[MAXLINE];
+    // build er ror mmessages
+    sprintf(genbuff, "%s<html><body> ERROR 403 Forbidden", genbuff);
+    sprintf(genbuff, "%s %s</body></html>", genbuff, urlbuff);
+    int linelength = strlen(genbuff);
+    sprintf(genbuff, "%s %s\r\n", "HTTP/1.0", "ERROR 403 Forbidden");
+    sprintf(genbuff, "%sProxy: PA3_webproxy\r\n", genbuff);
+    sprintf(genbuff, "%sContent-length: %d\r\n", genbuff, linelength);
+    sprintf(genbuff, "%sContent-type: %s\r\n\r\n", genbuff, "text/html");
+    sprintf(genbuff, "%s%s", genbuff, errorline);
+    
+    if(VERBOSE){printf(MSGERRR "%s" MSGNORM "\n", genbuff);}
+    write(serverfd, genbuff, strlen(genbuff));
+}
+
+
+/* function to build and send URL error messages */
+int URL_error_message_handler(int serverfd, char* urlbuff){
+    if(VERBOSE){printf(MSGTERM "Handling error message..." MSGNORM "\n");}
+    char genbuff[MAXBUF];
+    char errorline[MAXLINE];
+    if(urlbuff){ printf("%s is invalid\n", urlbuff); }
+    // build er ror mmessages
+    sprintf(genbuff, "%s<html><body>400 Bad Request Reason: Invalid Url:", genbuff);
+    sprintf(genbuff, "%s %s</body></html>", genbuff, urlbuff);
+    int linelength = strlen(genbuff);
+    sprintf(genbuff, "%s %s\r\n", "HTTP/1.0", "400 Bad Request");
+    sprintf(genbuff, "%sProxy: PA3_webproxy\r\n", genbuff);
+    sprintf(genbuff, "%sContent-length: %d\r\n", genbuff, linelength);
+    sprintf(genbuff, "%sContent-type: %s\r\n\r\n", genbuff, "text/html");
+    sprintf(genbuff, "%s%s", genbuff, errorline);
+    
+    if(VERBOSE){printf(MSGERRR "%s" MSGNORM "\n", genbuff);}
+    write(serverfd, genbuff, strlen(genbuff));
+}
+
+
+/* function to build and send VER error messages */
+int VER_error_message_handler(int serverfd, char* verbuff){
+    if(VERBOSE){printf(MSGTERM "Handling error message..." MSGNORM "\n");}
+    char genbuff[MAXBUF];
+    char errorline[MAXLINE];
+    if(verbuff){ printf("%s is invalid\n", verbuff); }
+    // build er ror mmessages
+    sprintf(genbuff, "<html><body>400 Bad Request Reason: Invalid HTTP-Version:");
+    sprintf(genbuff, "%s %s</body></html>", genbuff, verbuff);
+    int linelength = strlen(genbuff);
+    sprintf(genbuff, "%s %s\r\n", "HTTP/1.0", "400 Bad Request");
+    sprintf(genbuff, "%sProxy: PA3_webproxy\r\n", genbuff);
+    sprintf(genbuff, "%sContent-length: %d\r\n", genbuff, linelength);
+    sprintf(genbuff, "%sContent-type: %s\r\n\r\n", genbuff, "text/html");
+    sprintf(genbuff, "%s%s", genbuff, errorline);
+    
+    if(VERBOSE){printf(MSGERRR "%s" MSGNORM "\n", genbuff);}
+    write(serverfd, genbuff, strlen(genbuff));
+}
+
+
 /* called multiple times to connect a single server to the proxy */
 int connect_server_to_proxy(struct in_addr* inaddr){
-    if(VERBOSE){printf(MSGTERM "...creating connection..." MSGNORM "\n");}
+    if(VERBOSE){printf(MSGTERM "Creating connection..." MSGNORM "\n");}
     struct sockaddr_in sockaddrin_sk2;
     int sk2;
     int sk2_length;
@@ -282,76 +428,78 @@ int connect_server_to_proxy(struct in_addr* inaddr){
 }
 
 
+/* Sending request to target server */
+int send_request_to_server(int serverfd, char** argHTTP, char* endfox){
+    if(VERBOSE){printf(MSGTERM "Sending request to server..." MSGNORM "\n");}
+    char buff[MAXBUF];
+    memset(buff, 0, MAXBUF);
+
+    if(VERBOSE){printf(MSGTERM "...getting hostname..." MSGNORM "\n");}
+    int start_url = 0;
+    get_host_name_from_url(&start_url, argHTTP[1]);
+    if(start_url){ sprintf(buff, "GET %s HTTP/1.0\r\n\r\n", argHTTP[1]+start_url); }
+    else { sprintf(buff, "GET / HTTP/1.0\r\n\r\n"); }
+
+    if(VERBOSE){printf(MSGTERM "...buff: %s" MSGNORM "\n", buff);}
+    int httpbuff = write(serverfd, buff, strlen(buff));
+
+    if(VERBOSE){printf(MSGTERM "...httpbuff: %d" MSGNORM "\n", httpbuff);}
+    return httpbuff;
+}
+
+
 /* get data from server */
 int get_data_from_server(int connfd, FILE* filename, char* endfox, char** argHTTP){
-    int flag;
+    if(VERBOSE){printf(MSGTERM "Getting data from server..." MSGNORM "\n");}
     int serverfd;
-    int i, b_recv;
+    int b_recv;
     char buff[MAXBUF];
     struct hostent* host_entry;
     struct in_addr** in_addrs;
     host_entry = get_host_entry(argHTTP[1]);
-    if(!host_entry) {
-        send_bad_request(connfd, argHTTP, 4);
-        return 0;
-    }
+    
     in_addrs = (struct in_addr**) host_entry->h_addr_list;
-    i = 0;
-    flag = 0;
-
-    // request from target servers
+    int receiving_data = 1;
+    int i = 0;
     while(in_addrs[i] != NULL) {
         if(VERBOSE){printf(MSGTERM "...Connecting Proxy to Server..." MSGNORM "\n");}
         serverfd = connect_server_to_proxy(in_addrs[i]);
-        // to do connectRoutine -> connect_server_to_proxy
-        // make header and function
         i++;
-        if(serverfd < 0) {
-            continue;
-        }
+        if(serverfd < 0) { continue; }
 
         if(send_request_to_server(serverfd, argHTTP, endfox) <= 0) {
             if(VERBOSE){printf(MSGTERM "...Sending request to Server..." MSGNORM "\n");}
-            // to do sendRequest -> send_request_to_server
-            // make header and function
             close(serverfd);
             continue;
         }
 
         if(is_timer_expired(serverfd) <= 0) {
-            // to do Select -> is_timer_expired
-            // make header and function
             if(VERBOSE){printf(MSGTERM "...Server timer expired..." MSGNORM "\n");}
             close(serverfd);
             continue;
         }
 
-        // receive data
-        while(1) {
+        while(receiving_data) {
             memset(buff, 0, MAXBUF);
             b_recv = 0;
             b_recv = read(serverfd, buff, MAXBUF);
-            if(b_recv==0) break;
+            if(b_recv==0){ receiving_data=0; break;}
             write(connfd, buff, b_recv);
             fwrite(buff, 1, b_recv, filename);
+            if(VERBOSE){printf(MSGSUCC "%s" MSGNORM "\n", buff);}
         }
-        flag = 1;
         close(serverfd);
         break;
     }
 
-    // no data are sent
-    if(!flag) {
-        send_bad_request(connfd, argHTTP, 4);
-    }
     return 0;
 }
 
 
-/* get/return the host entry */
+/* get/return the host enty */
 struct hostent* get_host_entry(char* urlbuf){
+    if(VERBOSE){printf(MSGTERM "Getting host entry" MSGNORM "\n");}
     struct hostent *host_entry;
-
     char *host_name = get_host_name_from_url(NULL, urlbuf);
     if(VERBOSE){printf(MSGTERM "...host_name: %s" MSGNORM "\n", host_name);}
     if(VERBOSE){printf(MSGTERM "...Getting host by name, writeup function..." MSGNORM "\n");}
@@ -360,13 +508,30 @@ struct hostent* get_host_entry(char* urlbuf){
         return NULL;
     }
     free(host_name);
-
+    //if(VERBOSE){printf(MSGTERM "host entry: %s" MSGNORM "\n", host_entry->h_addr_list[0]);}
+    
     return host_entry;
 }
 
 
+/* sets the timeout of the socket */
+int is_timer_expired(int socketfd){
+    if(VERBOSE){printf(MSGTERM "Checking if timer expired" MSGNORM "\n");}
+    // struct timeval timeout; this is a global var now, set in beginning
+    struct timeval fto;
+    fto.tv_sec = 10;
+    fto.tv_usec = 0;
+    fd_set filedescriptor;
+    FD_ZERO(&filedescriptor);
+    FD_SET(socketfd, &filedescriptor);
+    int expiration = select(socketfd+1, &filedescriptor, NULL, NULL, &fto);
+    return expiration;
+}
+
+
 /* get the host name from the URL */
-char* get_host_name_from_url(int* urlstart, const char* urlbuf){
+char *get_host_name_from_url(int* urlstart, const char* urlbuf){
+    if(VERBOSE){printf(MSGTERM "Getting Hostname from URL" MSGNORM "\n");}
     char* host_name = NULL;
     int ptr_start=0;
     int ptr_end;
@@ -386,83 +551,71 @@ char* get_host_name_from_url(int* urlstart, const char* urlbuf){
     length = ptr_end - ptr_start + 1;
     host_name = calloc(1, length);
     memcpy(host_name, urlbuf + ptr_start, length-1);
+    if(VERBOSE){printf(MSGTERM "...Hostname: %s" MSGNORM "\n", host_name);}
     return host_name;
 }
 
 
 /* function for hashing the file */
-char * md5sum_hash_file(const char *fdata, size_t flen){
+char* md5sum_hash_file(const char *fdata, size_t flen){
     // HASH the thing
-    if(VERBOSE){printf(MSGTERM "...Hashing data..." MSGNORM "\n");}
-    size_t md5sum_length;
-    char * hash_final;
-    unsigned char md5sum[MD5_DIGEST_LENGTH];
-    MD5_CTX md5ctx;
-    memset(md5sum, 0, MD5_DIGEST_LENGTH);
+    if(VERBOSE){printf(MSGTERM "MD5SUM Hash File..." MSGNORM "\n");}
+    unsigned char md5sum_hash[MD5_DIGEST_LENGTH];
+    memset(md5sum_hash, 0, MD5_DIGEST_LENGTH);
 
+    MD5_CTX md5ctx;
     MD5_Init(&md5ctx);
     MD5_Update(&md5ctx, fdata, flen);
 
-    if(!MD5_Final(md5sum, &md5ctx)){
-        fprintf(stderr, "ERROR hashing md5sum \n");
+    if(!MD5_Final(md5sum_hash, &md5ctx)){
+        if(VERBOSE){printf(MSGERRR "...ERROR hashing File..." MSGNORM "\n");}
         return NULL;
     }
-
+    size_t md5sum_length;
     md5sum_length = MD5_DIGEST_LENGTH<<1+1;
+    if(VERBOSE){printf(MSGTERM "...md5sum length: %ld..." MSGNORM "\n", md5sum_length);}
+
+    char * hash_final;
     hash_final = malloc(md5sum_length);
     memset(hash_final, 0, md5sum_length);
 
     int i = 0;
-    for(i=0; i<MD5_DIGEST_LENGTH; i++){
-        sprintf(&hash_final[i*2], "%02x", (unsigned int)md5sum[i]);
-    }
-
-    if(VERBOSE){printf(MSGTERM "md5sum: %s" MSGNORM "\n", md5sum);}
+    for(i=0; i<MD5_DIGEST_LENGTH; i++){ sprintf(&hash_final[i*2], "%02x", (unsigned int)md5sum_hash[i]); }
+    if(VERBOSE){printf(MSGTERM "md5sum_hash: %s" MSGNORM "\n", md5sum_hash);}
     if(VERBOSE){printf(MSGTERM "hash_final: %s" MSGNORM "\n", hash_final);}
-
+    
     return hash_final;
-
 }
 
 
 /* if we found the file in our cache then we have to send it */
 int send_file_from_cache(int address, FILE* source_file){
-    int data_read;
-    int count = 0;
+    if(VERBOSE){printf(MSGTERM "Sending file from cache..." MSGNORM "\n");}
+    int dr = 0;
     char buff[MAXBUF];
     memset(buff, 0, MAXBUF);
     int getting_data = 1;
+    int data_read;
+    if(VERBOSE){printf(MSGTERM "...getting data" MSGNORM "\n");}
     while(getting_data){
         data_read = fread(buff, 1, MAXBUF, source_file);
-        
-        if(data_read <= 0) {return data_read;}
-
+        if(data_read <= 0) { return data_read; }
         write(address, buff, data_read);
-        count = data_read;
-        
-        if(data_read < MAXBUF){break;}
-
+        dr = data_read;
+        if(data_read < MAXBUF){ getting_data=0; break; }
         memset(buff, 0, MAXBUF);
         data_read = 0;
     }
-    return count;
+    if(VERBOSE){printf(MSGTERM "...dr: %d" MSGNORM "\n", dr);}
+    return dr;
 }
 
 
 /* search for the file in the cache */
-FILE * search_dir_for_file(const char* filename){
-    int time_diff;
-    time_t time_s;
+FILE* search_dir_for_file(const char* filename){
+    if(VERBOSE){printf(MSGTERM "Searching directory for file..." MSGNORM "\n");}
     struct stat stat_buff;
-
-    if(stat(filename, &stat_buff)){return NULL;} // file not found
-
-    time_s = time(NULL);
-    time_diff = time_s - stat_buff.st_mtime;
-
-    if(time_diff >= timeout.tv_sec-5){return NULL;}
-    if(timeout.tv_sec-5 <= 0){return NULL;}
-
+    if(stat(filename, &stat_buff)){ return NULL; }
     return fopen(filename, "r");
 }
 
@@ -470,7 +623,7 @@ FILE * search_dir_for_file(const char* filename){
 /* gets the filename extension
  * from PA2, might be useful
  */
-const char *get_fname_ext(const char *fname) {
+const char* get_fname_ext(const char *fname) {
     const char *period = strrchr(fname, '.');
     if(!period || period == fname){
         return "";
@@ -483,7 +636,7 @@ const char *get_fname_ext(const char *fname) {
 int is_valid_URL(const char* urlarg){
     // int len_urlarg = strlen(urlarg);
     if ((urlarg != NULL) && (urlarg[0] == '\0')) {
-        printf("urlarg is empty\n");
+        printf( MSGERRR "urlarg is empty" MSGNORM "\n");
         return 0;
     } else {
         return 1;
