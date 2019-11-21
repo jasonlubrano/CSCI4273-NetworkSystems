@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+Server: nginx
+Date: Thu, 21 Nov 2019 05:03:09 GMT
+Content-Type: text/html
+Connection: close
+Vary: Accept-Encoding
+Expires: Thu, 21 Nov 2019 05:03:08 GMT
+Cache-Control: no-cache
+
+<html><head><meta http-equiv="refresh" content="0;url=http://webhelper.centurylink.com/index.php?origURL=http://_/&bc="/></head><body><script type="text/javascript">window.location="http://webhelper.centurylink.com/index.php?origURL="+escape(window.location)+"&r="+escape(document.referrer)+"&bc=";</script></body></html>

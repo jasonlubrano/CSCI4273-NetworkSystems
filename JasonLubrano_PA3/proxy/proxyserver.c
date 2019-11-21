@@ -1,7 +1,5 @@
 /* 
  * proxyserver.c - A concurrent proxy server using threads
- * hashing resource: https://processhacker.sourceforge.io/doc/struct_m_d5___c_t_x.html
- * directory searching resource: https://docs.microsoft.com/en-us/windows/win32/fileio/listing-the-files-in-a-directory?redirectedfrom=MSDN
  */
 
 
@@ -50,8 +48,10 @@
 /* Functions used throughout */
 void runproxy(int connfd);
 void* thread(void *vargp);
+void remove_port(char* urlbuff);
 void check_ipbuff(char *ipbuff);
 int is_timer_expired(int socketfd);
+int port_check(char const* urlbuff);
 void check_host_name(int host_name);
 int is_valid_URL(const char* urlarg);
 int is_valid_VER(const char* verarg);
@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 
     if (argc == 2) {
         // no timeout, business as 
-        timeout.tv_sec = 30;
+        timeout.tv_sec = 60;
         timeout.tv_usec = 0;
     } else if (argc == 3){
         // set timeout
@@ -206,7 +206,14 @@ void runproxy(int connfd)
         if(VERBOSE){printf(MSGWARN "...Invalid URL" MSGNORM "\n");}
         is_validurl = 0;
     }
+    /*
+    if(port_check(urlbuf){
+        remove_port(urlbuf);
+    }
+    */
 
+   /* blacklisting is causing some SERIOUS issues */
+   /*
     if(VERBOSE){printf(MSGTERM "...Comparing URL against blacklisted sites..." MSGNORM "\n");}
     int is_urlblacklisted;
     if(is_url_blacklisted(urlbuf)){
@@ -218,6 +225,8 @@ void runproxy(int connfd)
         if(VERBOSE){printf(MSGTERM "...URL not blacklisted" MSGNORM "\n");}
         is_urlblacklisted = 0;
     }
+    */
+   int is_urlblacklisted = 0;
 
 
     if(is_validurl==1 && is_validver==1 && is_urlblacklisted==0){
@@ -229,21 +238,19 @@ void runproxy(int connfd)
         file_source = search_dir_for_file(url_chache);
         if(file_source){
             // found the file, great, send it
-            if(VERBOSE){printf(MSGTERM "...Hash File Found");}
+            if(VERBOSE){printf(MSGTERM "...Hash File Found" MSGNORM "\n");}
             send_file_from_cache(connfd, file_source);
             fclose(file_source);
             // return 0;
+        } else {
+            file_source = fopen(url_chache, "w");
+            int i;
+            for(i = 0;;i++){ if(buf[i] == '\n'){ break; }}
+
+            // pretty much the working part of the project right here.
+            get_data_from_server(connfd, file_source, buf+i+1, argHTTP);
+            if(file_source){ fclose(file_source);}
         }
-
-        file_source = fopen(url_chache, "w");
-        int i;
-        for(i = 0;;i++){ if(buf[i] == '\n'){ break; }}
-
-        // pretty much the working part of the project right here.
-        get_data_from_server(connfd, file_source, buf+i+1, argHTTP);
-        // TO DO finish this write up at the end
-
-        if(file_source){ fclose(file_source);}
 
     } else if(is_validver == 0) {
         // send invalid ver err
@@ -267,6 +274,38 @@ void runproxy(int connfd)
     bzero(ftype, SHORTBUF);
     bzero(contenttype, SHORTBUF);
     bzero(tempstr, MAXLINE);
+}
+
+
+/* remove port */
+void remove_port(char* urlbuff){
+    char portlessurlbuff[MAXLINE];
+    char* token1 = strtok(urlbuff, ":");
+    size_t tk1len = strlen(token1);
+    strncpy(urlbuff, token1, tk1len);
+    printf(MSGTERM "no port urlbuff: %s" MSGNORM "\n", urlbuff);
+    strcpy(portlessurlbuff, urlbuff);
+    strcpy(urlbuff, portlessurlbuff);
+}
+
+
+/* check for a port # */
+int port_check(char const* urlbuff){
+    if(VERBOSE){printf(MSGNORM "Checking url for port..." MSGNORM "\n");}
+    char const* p = urlbuff;
+    int count;
+    for(count=0; ; ++count){
+        p = strstr(p, ":");
+        if(!p){break;}
+        p++;
+    }
+    if(count > 1) {
+        if(VERBOSE){printf(MSGNORM "port on %s found..." MSGNORM "\n", urlbuff);}
+        return 1;
+    } else {
+        if(VERBOSE){printf(MSGNORM "port on %s not found..." MSGNORM "\n", urlbuff);}
+        return 0;
+    }
 }
 
 
@@ -325,9 +364,9 @@ int is_url_blacklisted(char* urlbuff){
     if(VERBOSE){printf(MSGTERM "URL Hostname: %s" MSGNORM "\n", urlbuff);}
     if(VERBOSE){printf(MSGTERM "URL IP: %s" MSGNORM "\n", url_ipbuff);}
     */
-    if(VERBOSE){printf(MSGSUCC "accessedsite: %s" MSGNORM "\n", get_host_name_from_url(NULL, urlbuff));}
+    if(VERBOSE){printf(MSGSUCC "accessed site: %s" MSGNORM "\n", get_host_name_from_url(NULL, urlbuff));}
     while(fgets(site, sizeof(site), fileptr)){
-        if(VERBOSE){printf(MSGWARN "blacklisted site: %s" MSGNORM "\n", site);}
+        // if(VERBOSE){printf(MSGWARN "blacklisted site: %s" MSGNORM "\n", site);}
         if(!strcmp(get_host_name_from_url(NULL, urlbuff), site)) {
             // direct comparison first
             printf(MSGERRR "Site was on blacklist" MSGNORM "\n");
@@ -502,36 +541,35 @@ struct hostent* get_host_entry(char* urlbuf){
     struct hostent *host_entry;
     char *host_name = get_host_name_from_url(NULL, urlbuf);
     if(VERBOSE){printf(MSGTERM "...host_name: %s" MSGNORM "\n", host_name);}
+    
     if(VERBOSE){printf(MSGTERM "...Getting host by name, writeup function..." MSGNORM "\n");}
     if(!(host_entry = gethostbyname(host_name))) {
+        // sometimes this is crashing...
         if(VERBOSE){printf(MSGERRR "...ERROR: geting host name failed. returning null." MSGNORM "\n");}
         return NULL;
     }
+    if(VERBOSE){printf(MSGTERM "host entry: %s" MSGNORM "\n", host_entry->h_addr_list[0]);}
     free(host_name);
-    //if(VERBOSE){printf(MSGTERM "host entry: %s" MSGNORM "\n", host_entry->h_addr_list[0]);}
-    
     return host_entry;
 }
 
 
 /* sets the timeout of the socket */
 int is_timer_expired(int socketfd){
-    if(VERBOSE){printf(MSGTERM "Checking if timer expired" MSGNORM "\n");}
+    if(VERBOSE){printf(MSGTERM "Checking if timer expired..." MSGNORM "\n");}
     // struct timeval timeout; this is a global var now, set in beginning
-    struct timeval fto;
-    fto.tv_sec = 10;
-    fto.tv_usec = 0;
     fd_set filedescriptor;
     FD_ZERO(&filedescriptor);
     FD_SET(socketfd, &filedescriptor);
-    int expiration = select(socketfd+1, &filedescriptor, NULL, NULL, &fto);
+    int expiration = select(socketfd+1, &filedescriptor, NULL, NULL, &timeout);
+    if(VERBOSE){printf(MSGTERM "... expiration: %d" MSGNORM "\n", expiration);}
     return expiration;
 }
 
 
 /* get the host name from the URL */
 char *get_host_name_from_url(int* urlstart, const char* urlbuf){
-    if(VERBOSE){printf(MSGTERM "Getting Hostname from URL" MSGNORM "\n");}
+    if(VERBOSE){printf(MSGTERM "Getting Hostname from URL..." MSGNORM "\n");}
     char* host_name = NULL;
     int ptr_start=0;
     int ptr_end;
@@ -615,8 +653,12 @@ int send_file_from_cache(int address, FILE* source_file){
 FILE* search_dir_for_file(const char* filename){
     if(VERBOSE){printf(MSGTERM "Searching directory for file..." MSGNORM "\n");}
     struct stat stat_buff;
-    if(stat(filename, &stat_buff)){ return NULL; }
-    return fopen(filename, "r");
+    if(stat(filename, &stat_buff)==0){
+        return fopen(filename, "r");
+    } else {
+        printf(MSGWARN "...Unable to find file in directory" MSGNORM "\n");
+        return NULL;
+    }
 }
 
 
