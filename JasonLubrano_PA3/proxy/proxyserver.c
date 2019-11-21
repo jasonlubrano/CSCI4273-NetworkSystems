@@ -48,11 +48,13 @@
 /* Functions used throughout */
 void runproxy(int connfd);
 void* thread(void *vargp);
+int is_buff_null(char* buff);
 void remove_port(char* urlbuff);
 void check_ipbuff(char *ipbuff);
 int is_timer_expired(int socketfd);
 int port_check(char const* urlbuff);
 void check_host_name(int host_name);
+int is_valid_GET(const char* getarg);
 int is_valid_URL(const char* urlarg);
 int is_valid_VER(const char* verarg);
 int is_url_blacklisted(char* urlbuf);
@@ -63,8 +65,9 @@ void check_host_entry(struct hostent * host_entry);
 int connect_server_to_proxy(struct in_addr* inaddr);
 int send_file_from_cache(int address, FILE* source_file);
 char* md5sum_hash_file(const char* filename, size_t len);
-int URL_error_message_handler(int serverfd, char* argHTTP);
-int VER_error_message_handler(int serverfd, char* argHTTP);
+int GET_error_message_handler(int serverfd, char* getbuff);
+int URL_error_message_handler(int serverfd, char* urlbuff);
+int VER_error_message_handler(int serverfd, char* verbuff);
 char* get_host_name_from_url(int* urlstart, const char* urlbuf);
 int blacklist_error_message_handler(int serverfd, char* urlbuff);
 int send_request_to_server(int serverfd, char** argHTTP, char* endfox);
@@ -148,6 +151,7 @@ void runproxy(int connfd)
     // char error400msg[]="HTTP/1.1 500 Internal Server Error\r\nContent-Type:text/plain\r\nContent-Length:0\r\n\r\n";
     int is_validurl = 0;
     int is_validver = 0;
+    int is_validget = 0;
 
     bzero(buf, MAXLINE);
     bzero(getbuf, SHORTBUF);
@@ -161,23 +165,39 @@ void runproxy(int connfd)
     size_t n = read(connfd, buf, MAXLINE);
     printf(MSGSUCC "server received the following request:\n%s" MSGNORM "\n", buf);
     
-    if(VERBOSE){printf(MSGTERM "PARSING REQUEST: %s" MSGNORM "\n", buf);}
-    // GET
-    char* token1 = strtok(buf, " ");
-    size_t tk1len = strlen(token1);
-    strncpy(getbuf, token1, tk1len);
-    printf(MSGTERM "getbuf: %s" MSGNORM "\n", getbuf);
-    // URL
-    char* token2 = strtok(NULL, " ");
-    size_t tk2len = strlen(token2); 
-    strncpy(urlbuf, token2, tk2len);
-    printf(MSGTERM "urlbuf: %s" MSGNORM "\n", urlbuf);
-    // VER
-    char* token3 = strtok(NULL, "\r\n");
-    size_t tk3len = strlen(token3);
-    strncpy(verbuf, token3, tk3len);
-    printf(MSGTERM "verbuf: %s" MSGNORM "\n", verbuf);
-    // argument array if i ever need to send all of them at once.
+
+    int nullbuffer;
+
+    if(is_buff_null(buf)){
+        nullbuffer = 1;    
+    } else {
+        nullbuffer = 1;
+    }
+
+    if(!is_buff_null(buf)){
+        if(VERBOSE){printf(MSGTERM "PARSING REQUEST: %s" MSGNORM "\n", buf);}
+        // GET
+        char* token1 = strtok(buf, " ");
+        size_t tk1len = strlen(token1);
+        strncpy(getbuf, token1, tk1len);
+        printf(MSGTERM "getbuf: %s" MSGNORM "\n", getbuf);
+        // URL
+        char* token2 = strtok(NULL, " ");
+        size_t tk2len = strlen(token2); 
+        strncpy(urlbuf, token2, tk2len);
+        printf(MSGTERM "urlbuf: %s" MSGNORM "\n", urlbuf);
+        // VER
+        char* token3 = strtok(NULL, "\r\n");
+        size_t tk3len = strlen(token3);
+        strncpy(verbuf, token3, tk3len);
+        printf(MSGTERM "verbuf: %s" MSGNORM "\n", verbuf);
+        // argument array if i ever need to send all of them at once.
+    } else {
+        strcpy(getbuf, "");
+        strcpy(urlbuf, "");
+        strcpy(verbuf, "");
+    }
+
     char* argHTTP[3];
     argHTTP[0] = getbuf;
     argHTTP[1] = urlbuf;
@@ -189,6 +209,16 @@ void runproxy(int connfd)
 
     FILE *file_source = NULL;
     
+    
+    if(VERBOSE){printf(MSGTERM "...Checking Request..." MSGNORM "\n");}
+    if (is_valid_GET(getbuf)){
+        if(VERBOSE){printf(MSGTERM "...Valid GET request" MSGNORM "\n");}
+        is_validget = 1;
+    } else {
+        if(VERBOSE){printf(MSGWARN "...Invalid GET request" MSGNORM "\n");}
+        is_validget = 0;
+    }
+
     if(VERBOSE){printf(MSGTERM "...Checking HTTP version..." MSGNORM "\n");}
     if (is_valid_VER(verbuf)){
         if(VERBOSE){printf(MSGTERM "...Valid HTTP version" MSGNORM "\n");}
@@ -229,29 +259,33 @@ void runproxy(int connfd)
    int is_urlblacklisted = 0;
 
 
-    if(is_validurl==1 && is_validver==1 && is_urlblacklisted==0){
+    if(is_validurl==1 && is_validver==1 && is_validget==1 && is_urlblacklisted==0){
         // check for blacklisted sites here
         char * url_md5sum = md5sum_hash_file(urlbuf, strlen(urlbuf)); // hash the urlbuff
         char url_chache[MAXBUF];
         memset(url_chache, 0, MAXBUF);
         sprintf(url_chache, "%s.cache", url_md5sum);
         file_source = search_dir_for_file(url_chache);
-        if(file_source){
+        if(file_source != NULL){
             // found the file, great, send it
             if(VERBOSE){printf(MSGTERM "...Hash File Found" MSGNORM "\n");}
             send_file_from_cache(connfd, file_source);
-            fclose(file_source);
             // return 0;
         } else {
+            if(VERBOSE){printf(MSGTERM "...Hash File not Found" MSGNORM "\n");}
             file_source = fopen(url_chache, "w");
             int i;
-            for(i = 0;;i++){ if(buf[i] == '\n'){ break; }}
-
+            for(i = 0;i<MAXBUF;i++){
+                if(buf[i] == '\n'){ break; }
+            }
             // pretty much the working part of the project right here.
             get_data_from_server(connfd, file_source, buf+i+1, argHTTP);
-            if(file_source){ fclose(file_source);}
         }
-
+        fclose(file_source);
+    } else if(is_validget == 0){
+        // send invalid request error
+        if(VERBOSE){printf(MSGWARN "...Invalid request: %s" MSGNORM "\n", getbuf);}
+        GET_error_message_handler(connfd, getbuf);
     } else if(is_validver == 0) {
         // send invalid ver err
         if(VERBOSE){printf(MSGWARN "...Invalid VER: %s" MSGNORM "\n", verbuf);}
@@ -274,6 +308,19 @@ void runproxy(int connfd)
     bzero(ftype, SHORTBUF);
     bzero(contenttype, SHORTBUF);
     bzero(tempstr, MAXLINE);
+}
+
+
+/* check whether the buffer is null, return 1 for true, 0 for false */
+int is_buff_null(char* buff){
+    printf(MSGTERM "Checking null buffer..." MSGNORM "\n");
+    if(!strcmp(buff, "")){
+        printf(MSGTERM "... buffer is null" MSGNORM "\n");
+        return 1;
+    } else {
+        printf(MSGTERM "... buffer is not null" MSGNORM "\n");
+        return 0;
+    }
 }
 
 
@@ -412,6 +459,27 @@ int URL_error_message_handler(int serverfd, char* urlbuff){
     // build er ror mmessages
     sprintf(genbuff, "%s<html><body>400 Bad Request Reason: Invalid Url:", genbuff);
     sprintf(genbuff, "%s %s</body></html>", genbuff, urlbuff);
+    int linelength = strlen(genbuff);
+    sprintf(genbuff, "%s %s\r\n", "HTTP/1.0", "400 Bad Request");
+    sprintf(genbuff, "%sProxy: PA3_webproxy\r\n", genbuff);
+    sprintf(genbuff, "%sContent-length: %d\r\n", genbuff, linelength);
+    sprintf(genbuff, "%sContent-type: %s\r\n\r\n", genbuff, "text/html");
+    sprintf(genbuff, "%s%s", genbuff, errorline);
+    
+    if(VERBOSE){printf(MSGERRR "%s" MSGNORM "\n", genbuff);}
+    write(serverfd, genbuff, strlen(genbuff));
+}
+
+
+/* function to build and send request error messages */
+int GET_error_message_handler(int serverfd, char* getbuff){
+    if(VERBOSE){printf(MSGTERM "Handling error message..." MSGNORM "\n");}
+    char genbuff[MAXBUF];
+    char errorline[MAXLINE];
+    if(getbuff){ printf("%s is invalid\n", getbuff); }
+    // build er ror mmessages
+    sprintf(genbuff, "<html><body>400 Bad Request. GET or POST supproted");
+    sprintf(genbuff, "%s %s</body></html>", genbuff, getbuff);
     int linelength = strlen(genbuff);
     sprintf(genbuff, "%s %s\r\n", "HTTP/1.0", "400 Bad Request");
     sprintf(genbuff, "%sProxy: PA3_webproxy\r\n", genbuff);
@@ -651,7 +719,7 @@ int send_file_from_cache(int address, FILE* source_file){
 
 /* search for the file in the cache */
 FILE* search_dir_for_file(const char* filename){
-    if(VERBOSE){printf(MSGTERM "Searching directory for file..." MSGNORM "\n");}
+    if(VERBOSE){printf(MSGTERM "Searching directory for file: %s..." MSGNORM "\n", filename);}
     struct stat stat_buff;
     if(stat(filename, &stat_buff)==0){
         return fopen(filename, "r");
@@ -674,9 +742,28 @@ const char* get_fname_ext(const char *fname) {
 }
 
 
+/* test whetehr the VER is valid: GET or POST */
+int is_valid_GET(const char* getarg){
+    if(strlen(getarg) == 0){ return 0; }
+    if(strcmp(getarg, "") == 0){ return 0; }
+    if ((getarg != NULL) && (getarg[0] == '\0')) {
+        printf("getarg is empty\n");
+        return 0;
+    } else if(strcmp(getarg, "GET") == 0) {
+        return 1;
+    } else if(strcmp(getarg, "POST") == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
 /* test whether the URL is valid */
 int is_valid_URL(const char* urlarg){
     // int len_urlarg = strlen(urlarg);
+    if(strlen(urlarg) == 0){ return 0; }
+    if(strcmp(urlarg, "") == 0){ return 0; }
     if ((urlarg != NULL) && (urlarg[0] == '\0')) {
         printf( MSGERRR "urlarg is empty" MSGNORM "\n");
         return 0;
@@ -688,7 +775,8 @@ int is_valid_URL(const char* urlarg){
 
 /* test whetehr the VER is valid */
 int is_valid_VER(const char* verarg){
-    if(strlen(verarg) == 0) return 0;
+    if(strlen(verarg) == 0){ return 0; }
+    if(strcmp(verarg, "") == 0){ return 0; }
     if ((verarg != NULL) && (verarg[0] == '\0')) {
         printf("verarg is empty\n");
         return 0;
