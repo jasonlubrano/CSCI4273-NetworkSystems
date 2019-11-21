@@ -123,7 +123,7 @@ void error(char *msg){
 
 
 /* thread routine */
-void* thread(void * vargp) 
+void* thread(void * vargp)
 {  
     int connfd = *((int *)vargp);
     pthread_detach(pthread_self()); 
@@ -166,7 +166,6 @@ void runproxy(int connfd)
     size_t n = read(connfd, buf, MAXLINE);
     printf(MSGSUCC "server received the following request:\n%s" MSGNORM "\n", buf);
     
-
     int nullbuffer;
 
     if(is_buff_null(buf)){
@@ -209,7 +208,6 @@ void runproxy(int connfd)
     if(VERBOSE){printf(MSGTERM "...checking blacklist" MSGNORM "\n");}
 
     FILE *file_source = NULL;
-    
     
     if(VERBOSE){printf(MSGTERM "...Checking Request..." MSGNORM "\n");}
     if (is_valid_GET(getbuf)){

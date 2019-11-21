@@ -1,0 +1,27 @@
+--------------------------------------------------------------------------------------------------
+Jason Lubrano
+CSCI4273 - Ha - Network Systems
+Programming Assignment 3
+--------------------------------------------------------------------------------------------------
+1. MAKE
+
+Located in directory: JasonLubrano_PA3/proxy
+
+Example:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA3/proxy$ make
+
+Makes the executable files for proxyserver.c
+Makes webproxy
+--------------------------------------------------------------------------------------------------
+2. PROXY SERVER
+
+Usage:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/proxy$ ./webproxy <port>
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/proxy$ ./webproxy <port> <timeout>
+
+Example:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/proxy$ ./webproxy 3001
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/proxy$ ./webproxy 3001 100
+--------------------------------------------------------------------------------------------------
+my code is spaghetti
+--------------------------------------------------------------------------------------------------
