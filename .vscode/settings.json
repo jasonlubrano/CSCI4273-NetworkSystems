@@ -2,6 +2,7 @@
     "files.associations": {
         "stdlib.h": "c",
         "vector": "cpp",
-        "netdb.h": "c"
+        "netdb.h": "c",
+        "stdarg.h": "c"
     }
 }
