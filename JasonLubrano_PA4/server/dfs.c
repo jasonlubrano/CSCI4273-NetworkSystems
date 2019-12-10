@@ -48,6 +48,8 @@
  */
 #define NUMSERVS    4       /* max number of servers */
 #define SERVPORT    8       /* max server port length */
+#define MAXCMDS     8       /* max length of a command */
+#define MAXAUTH     32      /* max info of a user */
 #define MAXCONN     32      /* max number of connections */
 #define FILEDIR     128     /* max file directory length */
 #define MAXLINE     256     /* max text line length */
@@ -69,6 +71,11 @@ void closing_message();
 void ret_exit();
 void data_from_config(const char* configFile, const char* serverFileDirectory);
 int socket_connection_routine(const char* port);
+int handle_commands_from_client(int sockfd);
+int handle_LIST(char* username, int sockfd);
+int handle_GET(const char* filename, char* username, int sockfd);
+int handle_PUT(const char* filename, char* username, int sockfd);
+int handle_EXIT();
 
 
 /*
@@ -79,8 +86,8 @@ struct timeval timeout;
 
 struct UserConfigs {
 	int		UserNum;
-	char	UserUsername[MAXLINE];
-	char	UserPassword[MAXLINE];
+	char	UserUsername[MAXAUTH];
+	char	UserPassword[MAXAUTH];
     char    FileDirectory[FILEDIR];
 } userconfigs;
 
@@ -113,7 +120,6 @@ int main(int argc, char **argv){
     
     struct sockaddr_in clientAddrIn;
     int sockfd;
-
     sockfd = socket_connection_routine(port);
     int fileDescriptorSet = getdtablesize();
     if(VERBOSE){ printf("..File Descriptor Set: %d\n", fileDescriptorSet); }
@@ -141,15 +147,16 @@ int main(int argc, char **argv){
             FD_SET(sockfdConn, &activeFileDescriptorSet);
         }
 
-        int sockcmdds;
-        for(sockcmdds=0; sockcmdds < fileDescriptorSet; ++sockcmdds){
-            if(FD_ISSET(sockcmdds, &readFileDescriptorSet) && sockcmdds != sockfd){
-                /* STOPPING HERE */
+        int socketfds;
+        for(socketfds=0; socketfds < fileDescriptorSet; ++socketfds){
+            if(FD_ISSET(socketfds, &readFileDescriptorSet) && socketfds != sockfd){
+                if(handle_commands_from_client(socketfds) == 0){
+                    close(socketfds);
+                    FD_CLR(socketfds, &activeFileDescriptorSet);
+                }
             }
         }
     }
-
-
     closing_message();
     
     return 0;
@@ -186,7 +193,7 @@ void ret_exit(){
 
 /* gets data from config file */
 void data_from_config(const char* configFile, const char* serverFileDirectory){
-    if(VERBOSE) { printf(MSGNORM "--Getting Data from Config--" MSGNORM "\n"); }
+    if(VERBOSE) { printf(MSGTERM "\n--Getting Data from Config--" MSGNORM "\n"); }
     FILE* file = fopen(configFile, "r");
     if(file == NULL){ printf(MSGERRR ".config file is NULL \nDoes it exist?" MSGNORM "\n"); ret_exit(); }
     else {
@@ -256,7 +263,7 @@ void data_from_config(const char* configFile, const char* serverFileDirectory){
 
 /* TCP routine to connect sockets */
 int socket_connection_routine(const char* port){
-    if(VERBOSE){printf("--Running Socket Connection Routine--\n"); }
+    if(VERBOSE){printf("\n" MSGTERM "--Running Socket Connection Routine--" MSGNORM "\n"); }
 	struct sockaddr_in sockAddrIn;
 	memset(&sockAddrIn, 0, sizeof(sockAddrIn));
     sockAddrIn.sin_family = AF_INET;
@@ -276,7 +283,7 @@ int socket_connection_routine(const char* port){
         if(bind(sockfd, (struct sockaddr *)&sockAddrIn, sizeof(sockAddrIn)) < 0){
             printf(MSGERRR "Error: Unable to bind port on: %s" MSGNORM "\n", port);
             ret_exit();
-        } else {
+        } else {    
             int socketLength = sizeof(sockAddrIn);
             if(getsockname(sockfd, (struct sockaddr *)&sockAddrIn, &socketLength) < 0){
                 printf(MSGERRR "Error Getting Socket Name" MSGNORM "\n");
@@ -293,3 +300,128 @@ int socket_connection_routine(const char* port){
     printf("Socket: %d connected on port: %d \n", sockfd, ntohs(sockAddrIn.sin_port));
     return sockfd;
 }
+
+
+/* command handler */
+int handle_commands_from_client(int sockfd){
+    printf("\n" MSGTERM "--Handling Commands from Client--" MSGNORM "\n");
+	char usrcmd[MAXCMDS];
+    char clientargs[MAXLINE];
+    char buffUser[MAXAUTH];
+    char buffPass[MAXAUTH];
+	int cmdLength = 0;
+	int is_AuthorizedApproved = 0;
+    char buff[MAXBUFF];
+    int returnValue;
+	while( (returnValue = recv(sockfd, &buff[cmdLength], (MAXBUFF-cmdLength), 0)) > 0) {
+		
+        if(VERBOSE){ printf(".returnValue: %d \n", returnValue);}
+        if(VERBOSE){ printf(".buff: %s \n", buff);}
+
+        char currentCommand[returnValue];
+
+		strncpy(currentCommand, &buff[cmdLength], sizeof(currentCommand));
+        if(VERBOSE){ printf(".currentCommand: %s\n", currentCommand); }
+		
+        cmdLength = cmdLength + returnValue;
+		currentCommand[returnValue] = '\0';
+        if(VERBOSE){ printf(".currentCommand: %s\n", currentCommand); }
+
+		if (cmdLength == returnValue) {
+			sscanf(currentCommand, "Username:%s Password:%s", buffUser, buffPass);
+
+			if (strcmp(userconfigs.UserUsername, buffUser) == 0 && 
+				strcmp(userconfigs.UserPassword, buffPass) == 0 ) {
+					is_AuthorizedApproved = 1;
+			}
+
+		} else if (cmdLength > returnValue) { 
+			if (is_AuthorizedApproved == 0) {
+				char authDeniedMsg[] = "Auth Denied. Invalid username or password.";
+                printf(MSGERRR "ERROR: Auth Denied. Invalid username or password." MSGNORM "\n");
+				
+                if (write(sockfd, authDeniedMsg, strlen(authDeniedMsg)) < 0){
+                    printf(MSGERRR "ERROR: Failed to tell client he was denied." MSGNORM "\n");
+                }
+
+				return returnValue;
+			}
+
+			sscanf(currentCommand, "%s %s", usrcmd, clientargs);
+
+			if (strncmp(usrcmd, "LIST", 4) == 0) {
+                if(VERBOSE){ printf(MSGSUCC ".Match on LIST" MSGNORM "\n"); }
+				handle_LIST(buffUser, sockfd);
+			} else if (strncmp(usrcmd, "GET", 3) == 0) {
+                if(VERBOSE){ printf(MSGSUCC ".Match on GET" MSGNORM "\n"); }
+				handle_GET(clientargs, buffUser, sockfd);
+			} else if (strncmp(usrcmd, "PUT", 3) == 0) {
+                if(VERBOSE){ printf(MSGSUCC ".Match on PUT" MSGNORM "\n"); }
+                handle_PUT(clientargs, buffUser, sockfd);
+			}
+			break;
+		}
+	}
+	
+	if (returnValue < 0){
+        printf(MSGERRR "ERROR: Handling read in cmd handler" MSGNORM "\n");
+        if(VERBOSE){ printf(".returnValue: %d \n", returnValue);}
+        if(VERBOSE){ printf(".buff: %s \n", buff);}
+
+        // ret_exit();
+    }
+
+	else{ return returnValue; }
+}
+
+int handle_LIST(char* username, int sockfd){
+    char filesList[MAXLINE];
+    sprintf(filesList, "%s/%s", userconfigs.FileDirectory, username);
+    if(VERBOSE){ printf(".filesList: %s \n", filesList);}
+
+    char fileBuff[MAXBUFF];
+    strcpy(fileBuff, "\0");
+
+    DIR *fileDirectory;
+    struct dirent *directoryEntry;
+    int numberOfFiles = 0;
+    if ((fileDirectory = opendir(filesList)) != NULL) {
+        while((directoryEntry = readdir(fileDirectory)) != NULL) {
+            if (strlen(directoryEntry->d_name) > 2) {
+                strcat(fileBuff, directoryEntry->d_name);
+                strcat(fileBuff, "\n");
+                numberOfFiles++;
+            }
+        }
+        closedir(fileDirectory);
+    } else {
+        printf(MSGERRR "ERROR: File directory is invalid" MSGNORM "\n");
+        return 0;
+    }
+
+    char *approvedMessage = "Auth Approved. Listing Files...";
+    if (write(sockfd, approvedMessage, strlen(approvedMessage)) < 0){
+        printf(MSGERRR "ERROR: Failed to write to user (code 1)" MSGNORM "\n");
+        ret_exit();
+    } else {
+        printf("Writing to user successful");
+    }
+
+    struct timespec nanotimeout;
+    nanotimeout.tv_sec = 0;
+    nanotimeout.tv_nsec = 100000000L; /* 0.1 seconds */
+    nanosleep(&nanotimeout, NULL);
+
+    /* Send file list */
+    if (write(sockfd, fileBuff, strlen(fileBuff)) < 0){
+        printf(MSGERRR "ERROR: Failed to write to user (code 2)" MSGNORM "\n");
+        ret_exit();
+    } else {
+        printf("Writing to user successful");
+    }
+    return 0;
+
+}
+
+int handle_GET(const char* filename, char* username, int sockfd){}
+int handle_PUT(const char* filename, char* username, int sockfd){}

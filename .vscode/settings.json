@@ -3,6 +3,7 @@
         "stdlib.h": "c",
         "vector": "cpp",
         "netdb.h": "c",
-        "stdarg.h": "c"
+        "stdarg.h": "c",
+        "in.h": "c"
     }
 }
