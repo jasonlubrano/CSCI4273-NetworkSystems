@@ -4,6 +4,7 @@
         "vector": "cpp",
         "netdb.h": "c",
         "stdarg.h": "c",
-        "in.h": "c"
+        "in.h": "c",
+        "sendfile.h": "c"
     }
 }
