@@ -212,17 +212,17 @@ void ret_exit(){
 }
 
 
-/* gets the data from the config filePtr */
+/* gets the data from the config file */
 void get_data_from_config(char* config_filename){
 	printf(MSGTERM "\n--Getting Data from Config--" MSGNORM "\n");
 	
 	FILE* filePtr = fopen(config_filename, "r");
 	if(filePtr == NULL){
-		printf(MSGERRR "\tConfig filePtr is NULL" MSGNORM "\n");
+		printf(MSGERRR "\tConfig file is NULL" MSGNORM "\n");
 		printf(MSGERRR "\t\tDoes it exist?" MSGNORM "\n");
 		ret_exit();
 	} else {
-		printf(MSGSUCC "\tConfig filePtr opened successfully" MSGNORM "\n");
+		printf(MSGSUCC "\tConfig file opened successfully" MSGNORM "\n");
 	}
 	
 	/* sets up the config table for blockchaining */
