@@ -656,7 +656,7 @@ void handle_PUT(void){
 	char fileNamePtr4[MAXFILE];
 	strcpy(fileNamePtr4, ".");
 	strcat(fileNamePtr4, nameOfFile);
-	strcat(fileNamePtr4, ".4");
+	strcat(fileNamePtr4, ".NUMSERVS");
 	if(VERBOSE){ printf(".fileNamePtr4: %s\n", fileNamePtr4); }
 
 	struct stat fileStat;
