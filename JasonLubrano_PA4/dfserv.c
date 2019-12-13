@@ -94,9 +94,6 @@ int main(int argc, char* argv[]){
 	switch (argc)
     {
     case 3:
-        if(argv[1][strlen(argv[1])-1] != '/'){
-			strcat(argv[1], "/");
-		}
 		strcpy(serverFileDirectory,argv[1]);
 
         if(VERBOSE){ printf(MSGNORM ".serverFileDirectory: %s" MSGNORM "\n", serverFileDirectory); }
@@ -285,16 +282,16 @@ void req_handler(void* requestPtr){
 				/* user gives us a userRequest */
 				int userRequest = get_user_request(recvBuff);
 				if(VERBOSE){ printf(".userRequest: %d", userRequest); }
-				if (userRequest == 0){
+				if (userRequest ==1){
 					/* Handle LIST */
 					handle_req_LIST(sockfd, wrkDir, cUsername);
-				} else if(userRequest == 1){
+				} else if(userRequest == 2){
 					/* handle GET */
 					char nameOfFile[MAXFILE];
 					parse_for_file_name(recvBuff, nameOfFile);
 					handle_req_GET(sockfd, wrkDir, nameOfFile);
 					keepalive = 0;
-				} else if(userRequest == 2){
+				} else if(userRequest == 3){
 					/* PUT */
 					char nameOfFile[MAXFILE];
 					parse_for_file_name(recvBuff, nameOfFile);

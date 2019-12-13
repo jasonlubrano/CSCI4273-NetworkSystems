@@ -132,13 +132,13 @@ int main(int argc, char** argv){
 				/* code */
 				handle_LIST();
 				break;
-			case NUMSOCKS:
+			case 2:
 				handle_GET();
 				break;
 			case 3:
 				handle_PUT();
 				break;
-			case NUMSERVS:
+			case 4:
 				ret_exit();
 				break;
 			default:

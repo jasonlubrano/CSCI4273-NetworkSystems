@@ -1,27 +1,32 @@
 --------------------------------------------------------------------------------------------------
 Jason Lubrano
 CSCI4273 - Ha - Network Systems
-Programming Assignment 3
+Programming Assignment 4
 --------------------------------------------------------------------------------------------------
 1. MAKE
 
-Located in directory: JasonLubrano_PA3/proxy
+Located in directory: JasonLubrano_PA4/
 
 Example:
-~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA3/proxy$ make
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/$ make
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/$ ./startservs
 
-Makes the executable files for proxyserver.c
-Makes webproxy
+startservs.sh makes the executibles for the client and the servers
+startservs.sh starts running the four servers
+the makefile makes the executables for the client and the proxy
 --------------------------------------------------------------------------------------------------
-2. PROXY SERVER
+2. Running the servers
 
 Usage:
-~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/proxy$ ./webproxy <port>
-~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/proxy$ ./webproxy <port> <timeout>
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/ ./dfserv directory port &
 
 Example:
-~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/proxy$ ./webproxy 3001
-~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA2/proxy$ ./webproxy 3001 100
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/ ./dfserv ./DFS1/ 10001 &
+--------------------------------------------------------------------------------------------------
+3. Running a client
+
+Usage:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/ ./dfcli dfc.conf
 --------------------------------------------------------------------------------------------------
 my code is spaghetti
 --------------------------------------------------------------------------------------------------
