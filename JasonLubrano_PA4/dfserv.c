@@ -512,9 +512,9 @@ int get_user_request(char* recvBuff){
 	char* lineTok = strtok(sockBuff, "\n");
 
 	while(lineTok != NULL){
-		if(strstr(lineTok, "LIST") != NULL) { return 2; }
-		else if(strstr(lineTok, "GET") != NULL){ return 0; }
-		else if(strstr(lineTok, "PUT") != NULL){ return 1; }
+		if(strstr(lineTok, "LIST") != NULL) { return 1; }
+		else if(strstr(lineTok, "GET") != NULL){ return 2; }
+		else if(strstr(lineTok, "PUT") != NULL){ return 3; }
 		lineTok = strtok(NULL, "\n");
 	}
 
@@ -576,7 +576,7 @@ void handle_req_LIST(int sockfd, char* DirectoryF, char* cUsername){
 /* whenever the PUT is called */
 void handle_req_PUT(int sockfd, char* wrkDir, char* nameOfFile){
 	printf(MSGTERM "\n--Handling PUT Request--" MSGNORM "\n");
-	char* ackOKString = "Ready for ACK %s\n\n";
+	char* ackOKString = "ACK OK %s\n\n";
 
 	char genBuff[SOCKFDR];	
 	sprintf(genBuff, ackOKString, nameOfFile);
@@ -596,9 +596,11 @@ void handle_req_PUT(int sockfd, char* wrkDir, char* nameOfFile){
 
 	char entireFilename[SOCKFDR];
 	strcpy(entireFilename, wrkDir);
+	if(VERBOSE){ printf(".entireFilename, wrkDir: %s\n", entireFilename); }
 	strcat(entireFilename, "/");
+	if(VERBOSE){ printf(".entireFilename, / : %s\n", entireFilename); }
 	strcat(entireFilename, nameOfFile);
-	if(VERBOSE){ printf(".entireFilename: %s\n", entireFilename); }
+	if(VERBOSE){ printf(".entireFilename, nameOfFile: %s\n", entireFilename); }
 
 	/* open the file for writing */
 	FILE* file = fopen(entireFilename, "w");

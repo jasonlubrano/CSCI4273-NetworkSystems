@@ -644,7 +644,7 @@ void handle_PUT(void){
 	char fileNamePtr2[MAXFILE];
 	strcpy(fileNamePtr2, ".");
 	strcat(fileNamePtr2, nameOfFile);
-	strcat(fileNamePtr2, ".NUMSOCKS");
+	strcat(fileNamePtr2, ".2");
 	if(VERBOSE){ printf(".fileNamePtr2: %s\n", fileNamePtr2); }
 
 	char fileNamePtr3[MAXFILE];
@@ -656,7 +656,7 @@ void handle_PUT(void){
 	char fileNamePtr4[MAXFILE];
 	strcpy(fileNamePtr4, ".");
 	strcat(fileNamePtr4, nameOfFile);
-	strcat(fileNamePtr4, ".NUMSERVS");
+	strcat(fileNamePtr4, ".4");
 	if(VERBOSE){ printf(".fileNamePtr4: %s\n", fileNamePtr4); }
 
 	struct stat fileStat;
@@ -1154,7 +1154,7 @@ void handle_GET(void){
 	recv(sockfd, recvBuff, sizeof(recvBuff), 0);
 	if(VERBOSE){ printf(".recvBuff: %s\n", recvBuff); }
 	
-	char* readyACKstr = "Ready for ACK\n\n";
+	char* readyACKstr = "ACK OK\n\n";
 	bytesRead = strlen(readyACKstr);
 	fBuffReadPtr = readyACKstr;
 	do{
@@ -1436,7 +1436,7 @@ void socket_connection_routine_cli_to_servs(int* sockfd, int index, char* nameUs
 		while(1){
 			int nBytesCp = recv((*sockfd), recvBuff, sizeof(recvBuff), MSG_DONTWAIT);
 			if(nBytesCp > 0){
-				if(strstr(recvBuff, "Ready for ACK") == NULL){
+				if(strstr(recvBuff, "ACK OK") == NULL){
 					printf("%s\n", recvBuff);
 					sockfd = NULL;
 				}
