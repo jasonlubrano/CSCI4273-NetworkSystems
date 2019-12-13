@@ -228,67 +228,67 @@ void get_data_from_config(char* config_filename){
 	/* sets up the config table for blockchaining */
 	/* first server, fptr1 */
 	dfsServerConfigs[0][0][0] = 1;
-	dfsServerConfigs[0][0][1] = NUMSOCKS;
+	dfsServerConfigs[0][0][1] = 4;
 	
 	/* first server, fptr2 */
-	dfsServerConfigs[0][1][0] = NUMSOCKS;
+	dfsServerConfigs[0][1][0] = 4;
 	dfsServerConfigs[0][1][1] = 3;
 	
 	/* first server, fptr3 */
 	dfsServerConfigs[0][NUMSOCKS][0] = 3;
-	dfsServerConfigs[0][NUMSOCKS][1] = NUMSERVS;
+	dfsServerConfigs[0][NUMSOCKS][1] = 2;
 	
 	/* first server, fptr4 */
-	dfsServerConfigs[0][3][0] = NUMSERVS;
+	dfsServerConfigs[0][3][0] = 4;
 	dfsServerConfigs[0][3][1] = 1;
 
 	/* second server, fptr1 */
-	dfsServerConfigs[1][0][0] = NUMSERVS;
+	dfsServerConfigs[1][0][0] = 4;
 	dfsServerConfigs[1][0][1] = 1;
 
 	/* second server, fptr2 */
 	dfsServerConfigs[1][1][0] = 1;
-	dfsServerConfigs[1][1][1] = NUMSOCKS;
+	dfsServerConfigs[1][1][1] = 2;
 	
 	/* second server, fptr3 */
-	dfsServerConfigs[1][NUMSOCKS][0] = NUMSOCKS;
+	dfsServerConfigs[1][NUMSOCKS][0] = 2;
 	dfsServerConfigs[1][NUMSOCKS][1] = 3;
 	
 	/* second server, fptr4 */
 	dfsServerConfigs[1][3][0] = 3;
-	dfsServerConfigs[1][3][1] = NUMSERVS;
+	dfsServerConfigs[1][3][1] = 4;
 
 	/* third server, fptr1 */
 	dfsServerConfigs[NUMSOCKS][0][0] = 3;
-	dfsServerConfigs[NUMSOCKS][0][1] = NUMSERVS;
+	dfsServerConfigs[NUMSOCKS][0][1] = 4;
 	
 	/* third server, fptr2 */
-	dfsServerConfigs[NUMSOCKS][1][0] = NUMSERVS;
+	dfsServerConfigs[NUMSOCKS][1][0] = 4;
 	dfsServerConfigs[NUMSOCKS][1][1] = 1;
 	
 	/* third server, fptr3 */
 	dfsServerConfigs[NUMSOCKS][NUMSOCKS][0] = 1;
-	dfsServerConfigs[NUMSOCKS][NUMSOCKS][1] = NUMSOCKS;
+	dfsServerConfigs[NUMSOCKS][NUMSOCKS][1] = 2;
 	
 	/* third server, fptr4 */
-	dfsServerConfigs[NUMSOCKS][3][0] = NUMSOCKS;
+	dfsServerConfigs[NUMSOCKS][3][0] = 2;
 	dfsServerConfigs[NUMSOCKS][3][1] = 3;
 
 	/* fourth server, fptr1 */
-	dfsServerConfigs[3][0][0] = NUMSOCKS;
+	dfsServerConfigs[3][0][0] = 2;
 	dfsServerConfigs[3][0][1] = 3;
 	
 	/* fourth server, fptr2 */
 	dfsServerConfigs[3][1][0] = 3;
-	dfsServerConfigs[3][1][1] = NUMSERVS;
+	dfsServerConfigs[3][1][1] = 4;
 	
 	/* fourth server, fptr3 */
-	dfsServerConfigs[3][NUMSOCKS][0] = NUMSERVS;
+	dfsServerConfigs[3][NUMSOCKS][0] = 4;
 	dfsServerConfigs[3][NUMSOCKS][1] = 1;
 	
 	/* fourth server, fptr4 */
 	dfsServerConfigs[3][3][0] = 1;
-	dfsServerConfigs[3][3][1] = NUMSOCKS;
+	dfsServerConfigs[3][3][1] = 2;
 
 	char lineInFile[MAXFILE];
 	while(fgets(lineInFile, sizeof(lineInFile), filePtr) != NULL){
@@ -656,7 +656,7 @@ void handle_PUT(void){
 	char fileNamePtr4[MAXFILE];
 	strcpy(fileNamePtr4, ".");
 	strcat(fileNamePtr4, nameOfFile);
-	strcat(fileNamePtr4, ".NUMSERVS");
+	strcat(fileNamePtr4, ".4");
 	if(VERBOSE){ printf(".fileNamePtr4: %s\n", fileNamePtr4); }
 
 	struct stat fileStat;
@@ -899,7 +899,7 @@ void handle_PUT(void){
 	close(sockfdOne);
 	close(sockfdTwo);			
 
-	/* send .NUMSERVS to the sockets */
+	/* send 4 to the sockets */
 	is_socketOneSet = 0;
 	is_socketTwoSet = 0;
 	for(socketIndx=0;socketIndx<NUMSERVS;socketIndx++){
