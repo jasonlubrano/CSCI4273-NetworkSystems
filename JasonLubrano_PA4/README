@@ -1,0 +1,32 @@
+--------------------------------------------------------------------------------------------------
+Jason Lubrano
+CSCI4273 - Ha - Network Systems
+Programming Assignment 4
+--------------------------------------------------------------------------------------------------
+1. MAKE
+
+Located in directory: JasonLubrano_PA4/
+
+Example:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/$ make
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/$ ./startservs
+
+startservs.sh makes the executibles for the client and the servers
+startservs.sh starts running the four servers
+the makefile makes the executables for the client and the proxy
+--------------------------------------------------------------------------------------------------
+2. Running the servers
+
+Usage:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/ ./dfserv directory port &
+
+Example:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/ ./dfserv ./DFS1/ 10001 &
+--------------------------------------------------------------------------------------------------
+3. Running a client
+
+Usage:
+~/Documents/CU_Boulder/CSCI4273-NetworkSystems/JasonLubrano_PA4/ ./dfcli dfc.conf
+--------------------------------------------------------------------------------------------------
+my code is spaghetti
+--------------------------------------------------------------------------------------------------
