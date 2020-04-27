@@ -239,7 +239,7 @@ void get_data_from_config(char* config_filename){
 	dfsServerConfigs[0][NUMSOCKS][1] = 2;
 	
 	/* first server, fptr4 */
-	dfsServerConfigs[0][3][0] = 4;
+	dfsServerConfigs[0][3][0] = 2;
 	dfsServerConfigs[0][3][1] = 1;
 
 	/* second server, fptr1 */
